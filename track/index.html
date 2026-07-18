@@ -153,7 +153,11 @@
     status: document.getElementById("status")
   };
 
-  var map = L.map("map", { zoomControl: true, attributionControl: true });
+  // Set a view up front. Beyond being a sane fallback, it marks the map
+  // "loaded" — invalidateSize() early-returns on an unloaded map, which would
+  // leave Leaflet's cached container size at 0x0 (see sizeMap below).
+  var map = L.map("map", { zoomControl: true, attributionControl: true })
+    .setView([47.95, -122.6], 8);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -162,16 +166,20 @@
   // The whole WSF system, Point Defiance up to the San Juans.
   var SYSTEM = L.latLngBounds([47.15, -123.25], [48.75, -122.20]);
 
-  // #map gets its height from the flex column, which isn't resolved when this
-  // script first runs — fitting against a zero-height container makes Leaflet
-  // fall through to maxZoom and park every marker thousands of pixels offscreen.
-  // So fit once the container actually has a size, and afterwards only tell
-  // Leaflet to re-measure, so a resize doesn't yank the view back from wherever
-  // the user has panned to.
+  // #map takes its height from the flex column, and Leaflet's stylesheet is a
+  // separate request — so on a cold cache this script can run before the
+  // container has any height. Fitting against a zero-height container makes
+  // getBoundsZoom fall through to maxZoom and parks every marker tens of
+  // thousands of pixels offscreen. So: measure the DOM directly rather than
+  // trusting Leaflet's cached size, and only fit once the container is real.
+  // Later calls just re-measure, so resizing doesn't yank the view back from
+  // wherever the user has panned to.
   var fitted = false;
   function sizeMap() {
+    var el = document.getElementById("map");
+    if (!el.clientHeight || !el.clientWidth) return;
     map.invalidateSize({ animate: false });
-    if (fitted || !map.getSize().y) return;
+    if (fitted) return;
     map.fitBounds(SYSTEM, { padding: [10, 10] });
     map.setMaxBounds(SYSTEM.pad(0.6));
     fitted = true;
