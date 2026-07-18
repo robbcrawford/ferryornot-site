@@ -2,6 +2,21 @@
 [build]
   publish = "."
 
+# Netlify domain aliases serve the same content rather than redirecting, so the
+# .com → .app canonicalization has to be explicit. force=true beats the file that
+# would otherwise be served. Netlify upgrades http→https first, so these cover both.
+[[redirects]]
+  from = "https://ferryornot.com/*"
+  to = "https://ferryornot.app/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.ferryornot.com/*"
+  to = "https://ferryornot.app/:splat"
+  status = 301
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
