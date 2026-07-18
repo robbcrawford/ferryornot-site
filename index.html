@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FerryOrNot — Ferry or drive? Know before you go.</title>
+<meta name="description" content="FerryOrNot compares taking the ferry versus driving around, door to door, using live Washington State Ferries schedules and traffic.">
+<style>
+  :root{
+    --parchment:#F6F1E6; --card:#FFFEF8; --ink:#1B2A41; --brass:#9C7A32;
+    --hairline:#E1D6BC; --muted:#5b6472;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--parchment);color:var(--ink);
+    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--brass);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:720px;margin:0 auto;padding:0 22px}
+  header{border-bottom:1px solid var(--hairline)}
+  nav{display:flex;gap:22px;align-items:center;padding:18px 0;font-size:15px}
+  nav .brand{margin-right:auto;display:flex;align-items:center;gap:10px;line-height:0}
+  nav .brand .mark{height:26px;width:26px;border-radius:22.4%;display:block}
+  nav .brand .wordmark img{height:24px;width:auto;display:block}
+  .hero .appicon{width:88px;height:88px;border-radius:22.4%;display:block;margin:0 0 22px}
+  .hero{padding:56px 0 40px}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.15;margin:0 0 14px}
+  h1 .or{color:var(--brass)}
+  .lede{font-size:19px;color:var(--muted);margin:0 0 28px}
+  .card{background:var(--card);border:1px solid var(--hairline);border-radius:16px;padding:22px 24px;margin:18px 0}
+  .btn{display:inline-block;background:var(--ink);color:var(--parchment)!important;padding:13px 22px;border-radius:12px;font-weight:600;text-decoration:none!important}
+  .btn:hover{opacity:.92}
+  ul.feat{list-style:none;padding:0;margin:8px 0 0}
+  ul.feat li{padding:9px 0;border-top:1px dashed var(--hairline)}
+  ul.feat li:first-child{border-top:0}
+  footer{border-top:1px solid var(--hairline);margin-top:48px;padding:26px 0 40px;color:var(--muted);font-size:13.5px}
+  .disclaimer{font-size:13px;color:var(--muted);margin-top:10px}
+  @media (prefers-color-scheme:dark){
+    :root{--parchment:#12161F;--card:#1B2230;--ink:#F3EFE3;--brass:#D2AC55;--hairline:#2C333F;--muted:#9aa3b2}
+    .btn{color:#12161F!important}
+  }
+</style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+  <a class="brand" href="/" aria-label="FerryOrNot home">
+    <img class="mark" src="/app-icon.png" alt="">
+    <span class="wordmark"><picture>
+      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="/wordmark-light.png" alt="FerryOrNot">
+    </picture></span>
+  </a>
+  <a href="/support">Support</a>
+  <a href="/privacy">Privacy</a>
+</nav></div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <img class="appicon" src="/app-icon.png" alt="FerryOrNot app icon">
+    <h1>Ferry <span class="or">or</span> drive?<br>Know before you go.</h1>
+    <p class="lede">FerryOrNot compares taking the ferry against driving around — door to door — using live Washington State Ferries schedules, delays, and traffic. So you catch the boat, or beat it.</p>
+    <a class="btn" href="https://testflight.apple.com/join/j1xDe64e">Join the TestFlight beta</a>
+  </section>
+
+  <section class="card">
+    <strong>What it does</strong>
+    <ul class="feat">
+      <li>Live ferry-vs-drive decisions, timed door to door</li>
+      <li>Real-time delays, cancellations &amp; drive-up space</li>
+      <li>Track your sailing on the Lock Screen</li>
+      <li>Leave-by reminders and saved commutes</li>
+    </ul>
+  </section>
+
+  <p class="disclaimer">Ferry schedules, vessel status, and drive-up space are provided by WSDOT / Washington State Ferries; traffic from Apple Maps. Space counts are advisory estimates, not guarantees. FerryOrNot is not affiliated with or endorsed by Washington State Ferries or WSDOT.</p>
+</main>
+
+<footer><div class="wrap">
+  © 2026 Chowen Labs, LLC · Bainbridge Island, WA · <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a><br>
+  <a href="/privacy">Privacy Policy</a> · <a href="/support">Support</a>
+</div></footer>
+</body>
+</html>

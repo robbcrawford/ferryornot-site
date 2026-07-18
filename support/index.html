@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — FerryOrNot</title>
+<meta name="description" content="Help with FerryOrNot: subscriptions, restoring purchases, location, and getting in touch.">
+<style>
+  :root{--parchment:#F6F1E6;--card:#FFFEF8;--ink:#1B2A41;--brass:#9C7A32;--hairline:#E1D6BC;--muted:#5b6472;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--parchment);color:var(--ink);
+    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--brass);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:720px;margin:0 auto;padding:0 22px}
+  header{border-bottom:1px solid var(--hairline)}
+  nav{display:flex;gap:22px;align-items:center;padding:18px 0;font-size:15px}
+  nav .brand{margin-right:auto;display:flex;align-items:center;gap:10px;line-height:0}
+  nav .brand .mark{height:26px;width:26px;border-radius:22.4%;display:block}
+  nav .brand .wordmark img{height:24px;width:auto;display:block}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:30px;margin:40px 0 6px}
+  h2{font-family:Georgia,"Times New Roman",serif;font-size:19px;margin:30px 0 6px}
+  .card{background:var(--card);border:1px solid var(--hairline);border-radius:16px;padding:18px 22px;margin:22px 0}
+  .card a{font-weight:600}
+  footer{border-top:1px solid var(--hairline);margin-top:48px;padding:26px 0 40px;color:var(--muted);font-size:13.5px}
+  .fine{color:var(--muted);font-size:13.5px}
+  @media (prefers-color-scheme:dark){
+    :root{--parchment:#12161F;--card:#1B2230;--ink:#F3EFE3;--brass:#D2AC55;--hairline:#2C333F;--muted:#9aa3b2}
+  }
+</style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+  <a class="brand" href="/" aria-label="FerryOrNot home">
+    <img class="mark" src="/app-icon.png" alt="">
+    <span class="wordmark"><picture>
+      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="/wordmark-light.png" alt="FerryOrNot">
+    </picture></span>
+  </a>
+  <a href="/privacy">Privacy</a>
+  <a href="/">Home</a>
+</nav></div></header>
+
+<main class="wrap">
+  <h1>Support</h1>
+
+  <div class="card">
+    Need help or found a bug? Email <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a> and we’ll get back to you.
+  </div>
+
+  <h2>What does FerryOrNot do?</h2>
+  <p>It compares taking the ferry against driving all the way around — timed door to door — using live Washington State Ferries schedules, delays, and drive-up space, plus current traffic. It tells you which is faster, when to leave, and whether you’ll make the next boat.</p>
+
+  <h2>How much does it cost?</h2>
+  <p>FerryOrNot Plus starts with a <strong>7-day free trial</strong>, then <strong>$1.99/month</strong> or <strong>$19.99/year</strong>. Both plans begin with the free trial. Payment is charged to your Apple ID; the subscription renews automatically unless canceled at least 24 hours before the end of the current period.</p>
+
+  <h2>How do I manage or cancel my subscription?</h2>
+  <p>On your iPhone: <strong>Settings → tap your name → Subscriptions → FerryOrNot</strong>, then change plan or cancel. You can also open the app and go to <strong>Settings → FerryOrNot Plus → Manage subscription</strong>. Canceling stops future renewals; you keep access through the end of the period you’ve already paid for.</p>
+
+  <h2>How do I restore my subscription on a new device?</h2>
+  <p>Sign in with the same Apple ID, open FerryOrNot, and tap <strong>Restore purchases</strong> on the subscription screen (or in <strong>Settings → FerryOrNot Plus</strong>).</p>
+
+  <h2>Why does it ask for my location?</h2>
+  <p>Location is used to estimate your drive time to the ferry terminal and, optionally, to remind you as you approach a terminal. It’s used only while you’re using the app, and you can limit or turn it off in iOS Settings. See our <a href="/privacy">Privacy Policy</a>.</p>
+
+  <h2>Is the ferry data official?</h2>
+  <p>Schedules, vessel status, and drive-up space come from WSDOT / Washington State Ferries; traffic comes from Apple Maps. Space counts and predictions are advisory estimates, not guarantees — always allow a margin.</p>
+
+  <p class="fine">FerryOrNot is not affiliated with or endorsed by Washington State Ferries or the Washington State Department of Transportation.</p>
+</main>
+
+<footer><div class="wrap">
+  © 2026 Chowen Labs, LLC · Bainbridge Island, WA · <a href="/">FerryOrNot</a> · <a href="/privacy">Privacy</a>
+</div></footer>
+</body>
+</html>
