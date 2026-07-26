@@ -64,8 +64,7 @@
   .chip.op{border-color:var(--bad);color:var(--bad)}
 
   /* ---- columns ---- */
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
-  @media (max-width:860px){.cols{grid-template-columns:1fr}}
+  .cols{margin-top:18px}
   .coltitle{font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
     color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--hairline)}
 
@@ -119,6 +118,40 @@
   .turn b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
   .swap{font-size:11.5px;padding:2px 7px;border-radius:5px;margin-left:6px;
     background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+
+  /* ---- shared vertical timeline ----
+     Chips are positioned by CLOCK TIME, not by list order, so a row across the page
+     is a moment: what every boat was doing at once. That is the thing a stacked list
+     cannot show, and it is what makes a disrupted day legible. */
+  .tl{position:relative;margin-top:10px}
+  .tl-head{display:grid;gap:14px;position:sticky;top:0;z-index:20;
+    background:var(--parchment);padding:8px 0 6px;border-bottom:1px solid var(--hairline)}
+  .tl-body{position:relative;display:grid;gap:14px;margin-top:14px}
+  .tl-rule{position:absolute;left:0;right:0;border-top:1px solid var(--hairline);
+    opacity:.55;pointer-events:none}
+  .tl-rule.hour{opacity:1}
+  .tl-label{position:absolute;left:0;font-size:11px;color:var(--muted);
+    font-variant-numeric:tabular-nums;transform:translateY(-50%);pointer-events:none}
+  .tl-track{position:relative}
+  .tl .sail{position:absolute;left:0;right:0;margin-top:0}
+  .tl .sail.open{z-index:15;box-shadow:0 8px 28px rgba(0,0,0,.28)}
+  .sailhead{padding:7px 11px;gap:9px}
+  .ct{font-size:14.5px;font-variant-numeric:tabular-nums}
+  .ct.act{font-weight:600}
+  .ct.pred{color:var(--brass)}
+  .ct-sched{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ct-sched::before{content:"sched "}
+  /* The slip from scheduled time to when the boat actually went. */
+  .slip{position:absolute;width:2px;background:var(--warn);opacity:.5;left:-9px;
+    border-radius:1px;pointer-events:none}
+  .slip.bad{background:var(--bad);opacity:.6}
+  .tl-empty{color:var(--muted);font-size:13px;padding:20px 0}
+  /* Time the boat spends at the berth, drawn as the span it occupies. */
+  .berth{position:absolute;left:14px;width:0;border-left:2px dotted var(--hairline);
+    pointer-events:none}
+  .berth-lab{position:absolute;top:50%;left:6px;transform:translateY(-50%);
+    font-size:10.5px;color:var(--muted);background:var(--parchment);padding:0 3px;
+    white-space:nowrap}
 </style>
 </head>
 <body>
@@ -430,22 +463,27 @@ function sailingHTML(s, showDir){
                   String(s.vesselId) !== String(s.plannedVesselId);
   const swapBadge = swapped
     ? `<span class="swap">in for ${s.plannedVessel || s.plannedVesselId}</span>` : "";
-  return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
-    <div class="sailhead" title="${s.id}">
+  // On the timeline the chip's POSITION already states when the boat went, so the
+  // header collapses to one line: the time that matters, the scheduled time it is
+  // measured against, and the delay. Anything taller and chips collide at real ferry
+  // headways — measured before this change, 9 of 20 consecutive pairs overlapped.
+  const overdue = (s.basis || "").includes("OVERDUE");
+  const lead = s.actual ? pacTime(s.actual)
+             : overdue ? "overdue"
+             : s.predicted ? pacTime(s.predicted) : "—";
+  const head = `<div class="sailhead" title="${s.id}">
       <span class="caret">▸</span>
       ${showDir ? `<span class="dir">${s.dirLabel}</span>` : ""}
-      <div class="times">
-        <div class="t"><span class="lab">sched</span><span class="val">${pacTime(s.sched)}</span></div>
-        <div class="t pred"><span class="lab">predicted</span><span class="val">${
-          (s.basis||"").includes("OVERDUE") ? "overdue" : pacTime(s.predicted)}</span></div>
-        <div class="t act"><span class="lab">actual</span><span class="val">${pacTime(s.actual)}</span></div>
-        ${s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
-        ${swapBadge}
-      </div>
+      <span class="ct ${s.actual ? "act" : "pred"}">${lead}</span>
+      <span class="ct-sched">${pacTime(s.sched)}</span>
+      ${s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
+      ${swapBadge}
       <div class="occ">
         ${occ != null ? `<span>${occ}%</span><span class="bar"><i style="width:${Math.min(100,occ)}%"></i></span>` : ""}
       </div>
-    </div>
+    </div>`;
+  return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
+    ${head}
     <div class="body">
       <div class="kv">
         <div><span>id</span>${s.id}</div>
@@ -513,33 +551,112 @@ function groupsFor(payload, mode){
     .sort((a,b) => a.label.localeCompare(b.label));
 }
 
-// The layover between the previous leg arriving and this one departing. Shown only in
-// vessel mode, where consecutive blocks are genuinely consecutive legs of one boat.
-function turnHTML(prev, s){
-  if (!prev) return "";
-  const from = prev.arrived, to = s.actual || s.predicted;
-  if (!from || !to) return "";
-  const mins = Math.round((new Date(to) - new Date(from)) / 60000);
+// The layover between one leg arriving and the next departing, drawn ON the axis as
+// the span it actually occupies. Only meaningful in vessel mode, where consecutive
+// chips in a track are genuinely consecutive legs of one boat.
+function turnMarkup(prev, s, y, chipTop){
+  if (!prev || !prev.arrived) return "";
+  const to = s.actual || s.predicted;
+  if (!to) return "";
+  const mins = Math.round((new Date(to) - new Date(prev.arrived)) / 60000);
   if (mins < 0 || mins > 240) return "";
-  const modelled = s.turnaround != null ? ` <span class="muted">(recorded ${s.turnaround}m)</span>` : "";
-  return `<div class="turn">↳ <b>${mins} min</b> at berth${modelled}${
-    s.actual ? "" : ' <span class="muted">— predicted</span>'}</div>`;
+  const top = y(prev.arrived), h = Math.max(2, chipTop - top);
+  return `<div class="berth" style="top:${top - chipTop}px;height:${h}px">
+            <span class="berth-lab">${mins}m</span></div>`;
 }
+
+// Where a chip sits on the axis: when the boat ACTUALLY went, falling back to the
+// prediction and then to the schedule. Positioning by scheduled time would draw the
+// timetable rather than the day — a boat an hour late would still sit in its printed
+// slot, which is precisely the discrepancy worth seeing.
+const chipTime = (s) => s.actual || s.predicted || s.sched;
+
+const PX_PER_MIN = 1.7;   // ~45-min headway ≈ 76px, enough for a compact chip
+const CHIP_H = 60;   // measured height of a collapsed chip; drives overlap detection
 
 function render(payload){
   const cols = $("cols");
   const mode = $("groupby").value;
   const groups = groupsFor(payload, mode);
-  cols.style.gridTemplateColumns = `repeat(${Math.min(groups.length || 1, 3)}, 1fr)`;
-  cols.innerHTML = groups.map(g => {
+  const all = groups.flatMap(g => g.sailings);
+  if (!all.length){ cols.innerHTML = '<div class="tl-empty">No sailings for this day.</div>'; return; }
+
+  const times = all.map(s => new Date(chipTime(s)).getTime());
+  // Round out to whole hours so the gridlines read as clock times.
+  const startMs = Math.floor(Math.min(...times) / 3600000) * 3600000;
+  const endMs   = Math.ceil((Math.max(...times) + 20*60000) / 3600000) * 3600000;
+  const minsFrom = (ms) => (ms - startMs) / 60000;
+  const y = (iso) => minsFrom(new Date(iso).getTime()) * PX_PER_MIN;
+  const height = minsFrom(endMs) * PX_PER_MIN + CHIP_H;
+  const gridCols = `54px repeat(${groups.length}, minmax(0,1fr))`;
+
+  // Hour rules span the full width so the eye can carry a moment across columns.
+  let rules = "";
+  for (let ms = startMs; ms <= endMs; ms += 1800000){
+    const top = y(new Date(ms).toISOString());
+    const onHour = (ms % 3600000) === 0;
+    rules += `<div class="tl-rule ${onHour ? "hour" : ""}" style="top:${top}px"></div>`;
+    if (onHour) rules += `<div class="tl-label" style="top:${top}px">${pacTime(new Date(ms).toISOString())}</div>`;
+  }
+
+  // Genuinely simultaneous chips share the track's width, calendar-style, rather than
+  // being nudged apart. Nudging would preserve legibility by lying about the time,
+  // which defeats the axis. Observed on 2026-07-25: a phantom slot cleared back to
+  // SCHEDULED sits exactly where another boat actually departed — they really are at
+  // the same moment, and the layout should say so.
+  const laneOf = (sailings) => {
+    const items = sailings.map((s, i) => ({ i, top: y(chipTime(s)) }))
+                          .sort((a,b) => a.top - b.top);
+    const lanes = new Array(sailings.length).fill(null);
+    let cluster = [];
+    const flush = () => {
+      cluster.forEach((it, k) => lanes[it.i] = { lane: k, of: cluster.length });
+      cluster = [];
+    };
+    for (const it of items){
+      if (cluster.length && it.top >= Math.max(...cluster.map(c => c.top)) + CHIP_H) flush();
+      cluster.push(it);
+    }
+    flush();
+    return lanes;
+  };
+
+  const tracks = groups.map(g => {
     let prev = null;
-    const body = g.sailings.map(s => {
-      const html = (mode === "vessel" ? turnHTML(prev, s) : "") + sailingHTML(s, g.showDir);
+    const lanes = laneOf(g.sailings);
+    const chips = g.sailings.map((s, idx) => {
+      const top = y(chipTime(s));
+      // A vertical stem from the printed slot down to when it actually left: delay
+      // rendered as a length rather than a number you have to subtract.
+      const berth = mode === "vessel" ? turnMarkup(prev, s, y, top) : "";
       prev = s;
-      return html;
+      let slip = "";
+      if (s.actual && s.delay != null && s.delay >= 3){
+        const from = y(s.sched), h = Math.max(2, top - from);
+        slip = `<div class="slip ${s.delay > 20 ? "bad" : ""}" style="top:${from - top}px;height:${h}px"></div>`;
+      }
+      const L = lanes[idx] || { lane: 0, of: 1 };
+      const w = 100 / L.of, x = L.lane * w;
+      return `<div style="position:absolute;top:${top}px;left:${x}%;width:${w}%;
+                          padding-right:${L.of > 1 ? 4 : 0}px">${berth}${slip}${
+        sailingHTML(s, g.showDir)}</div>`;
     }).join("");
-    return `<div><div class="coltitle">${g.label} <span class="muted">(${g.sailings.length})</span></div>${body}</div>`;
+    return `<div class="tl-track">${chips}</div>`;
   }).join("");
+
+  cols.innerHTML = `
+    <div class="tl">
+      <div class="tl-head" style="grid-template-columns:${gridCols}">
+        <div></div>
+        ${groups.map(g => `<div class="coltitle" style="border:0;padding:0">${g.label}
+          <span class="muted">(${g.sailings.length})</span></div>`).join("")}
+      </div>
+      <div class="tl-body" style="grid-template-columns:${gridCols};height:${height}px">
+        ${rules}
+        <div></div>
+        ${tracks}
+      </div>
+    </div>`;
 
   const bar = [];
   for (const w of payload.waits || []){
