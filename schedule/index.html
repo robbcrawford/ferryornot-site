@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Schedule Inspector — FerryOrNot</title>
+<meta name="description" content="Internal tool.">
+<style>
+  :root{
+    --parchment:#F6F1E6; --card:#FFFEF8; --ink:#1B2A41; --brass:#9C7A32;
+    --hairline:#E1D6BC; --muted:#5b6472;
+    --ok:#2f7d52; --warn:#b06a1e; --bad:#a33131; --track:#E8E0CC;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--parchment:#12161F;--card:#1B2230;--ink:#F3EFE3;--brass:#D2AC55;
+      --hairline:#2C333F;--muted:#9aa3b2;
+      --ok:#6bbd8c;--warn:#e0a458;--bad:#e07070;--track:#2C333F}
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--parchment);color:var(--ink);
+    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--brass);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 22px;width:100%}
+  header{border-bottom:1px solid var(--hairline)}
+  nav{display:flex;gap:22px;align-items:center;padding:18px 0;font-size:15px}
+  nav .brand{margin-right:auto;display:flex;align-items:center;gap:10px;line-height:0}
+  nav .brand .mark{height:26px;width:26px;border-radius:22.4%;display:block}
+  nav .brand .wordmark img{height:24px;width:auto;display:block}
+  h1{font-size:22px;margin:26px 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+  footer{border-top:1px solid var(--hairline);margin-top:40px;padding:20px 0 26px;
+    color:var(--muted);font-size:13px}
+
+  /* ---- gate ---- */
+  #gate{max-width:380px;margin:60px auto}
+  #gate .card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:22px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+  input[type=email],input[type=password],input[type=text]{width:100%;padding:9px 11px;
+    border:1px solid var(--hairline);border-radius:8px;background:var(--parchment);
+    color:var(--ink);font-size:15px}
+  button{background:var(--brass);color:var(--card);border:0;border-radius:8px;
+    padding:9px 16px;font-size:15px;cursor:pointer;margin-top:16px}
+  button.ghost{background:transparent;color:var(--brass);border:1px solid var(--hairline)}
+  button:disabled{opacity:.5;cursor:default}
+  .err{color:var(--bad);font-size:13.5px;margin-top:10px;min-height:19px}
+  .qr{margin:14px 0;text-align:center}
+  .qr img{max-width:190px;background:#fff;padding:8px;border-radius:8px}
+  code.secret{display:block;word-break:break-all;font-size:12px;color:var(--muted);
+    background:var(--parchment);padding:8px;border-radius:6px;margin-top:8px}
+
+  /* ---- controls ---- */
+  .controls{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;
+    padding:14px 0 18px;border-bottom:1px solid var(--hairline)}
+  select{padding:8px 11px;border:1px solid var(--hairline);border-radius:8px;
+    background:var(--card);color:var(--ink);font-size:15px}
+  .controls label{margin:0 0 4px}
+  .spacer{margin-left:auto}
+  .daybar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}
+  .chip{font-size:12.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--hairline);
+    background:var(--card);color:var(--muted)}
+  .chip.wait{border-color:var(--warn);color:var(--warn)}
+  .chip.op{border-color:var(--bad);color:var(--bad)}
+
+  /* ---- columns ---- */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
+  @media (max-width:860px){.cols{grid-template-columns:1fr}}
+  .coltitle{font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--hairline)}
+
+  /* ---- sailing block ---- */
+  .sail{background:var(--card);border:1px solid var(--hairline);border-radius:10px;
+    margin-top:10px;overflow:hidden}
+  .sail.late{border-left:3px solid var(--warn)}
+  .sail.verylate{border-left:3px solid var(--bad)}
+  .sail.ontime{border-left:3px solid var(--ok)}
+  .sail.pending{border-left:3px dashed var(--muted)}
+  .sailhead{display:flex;align-items:center;gap:12px;padding:10px 13px;cursor:pointer;
+    user-select:none}
+  .sailhead:hover{background:color-mix(in srgb,var(--brass) 7%,transparent)}
+  .times{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+  .t{font-variant-numeric:tabular-nums}
+  .t .lab{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    display:block;line-height:1.3}
+  .t .val{font-size:16px}
+  .t.pred .val{color:var(--brass)}
+  .t.act .val{font-weight:600}
+  .delay{font-size:13px;font-variant-numeric:tabular-nums}
+  .delay.ok{color:var(--ok)} .delay.warn{color:var(--warn)} .delay.bad{color:var(--bad)}
+  .occ{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .bar{width:52px;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--brass)}
+  .caret{color:var(--muted);font-size:12px;transition:transform .15s}
+  .sail.open .caret{transform:rotate(90deg)}
+  .body{display:none;padding:0 13px 14px;border-top:1px solid var(--hairline)}
+  .sail.open .body{display:block}
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px 18px;
+    margin:12px 0;font-size:13px}
+  .kv div span{display:block;color:var(--muted);font-size:11px;letter-spacing:.05em;
+    text-transform:uppercase}
+  .flag{display:inline-block;font-size:11.5px;padding:2px 7px;border-radius:5px;
+    background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad);margin-right:5px}
+  .sec{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    margin:16px 0 6px}
+  table.trail{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+  table.trail th{text-align:left;color:var(--muted);font-weight:500;padding:3px 8px 3px 0;
+    font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+  table.trail td{padding:3px 8px 3px 0;border-top:1px solid var(--hairline)}
+  .muted{color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  svg.curve{width:100%;height:120px;display:block}
+</style>
+</head>
+<body>
+
+<header><div class="wrap"><nav>
+  <a class="brand" href="/" aria-label="FerryOrNot home">
+    <img class="mark" src="/app-icon.png" alt="">
+    <span class="wordmark"><picture>
+      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="/wordmark-light.png" alt="FerryOrNot">
+    </picture></span>
+  </a>
+  <span class="spacer"></span>
+  <a href="#" id="signout" style="display:none">Sign out</a>
+</nav></div></header>
+
+<!-- ---------------- gate ---------------- -->
+<div id="gate" style="display:none">
+  <div class="card">
+    <h1 style="margin-top:0">Schedule Inspector</h1>
+    <p class="sub">Internal tool. Sign-in required.</p>
+
+    <div id="step-password">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password">
+      <button id="btn-signin">Sign in</button>
+    </div>
+
+    <div id="step-totp" style="display:none">
+      <p class="sub">Enter the 6-digit code from your authenticator app.</p>
+      <label for="totp">Authentication code</label>
+      <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+      <button id="btn-totp">Verify</button>
+    </div>
+
+    <div id="step-enroll" style="display:none">
+      <p class="sub">Two-factor authentication is not set up yet.</p>
+      <div id="enroll-intro">
+        <p class="sub"><strong>Before you start:</strong> delete any half-finished
+          “Schedule Inspector” or “Supabase” entry for this account from your
+          authenticator app first — a stale entry holds an old secret and its codes
+          will never be accepted.</p>
+        <p class="sub">Generating a QR replaces any previous one, so scan and verify in
+          a single sitting. <strong>Reloading this page invalidates the code you just
+          scanned.</strong></p>
+        <button id="btn-begin">Generate a QR code</button>
+        <button id="btn-skip" class="ghost">Skip for now</button>
+      </div>
+      <div id="enroll-live" style="display:none">
+        <div class="qr"><img id="qr" alt="TOTP QR code"></div>
+        <p class="sub" id="enroll-label" style="text-align:center;font-size:12.5px"></p>
+        <code class="secret" id="secret"></code>
+        <label for="enrollcode">Code from the app</label>
+        <input id="enrollcode" type="text" inputmode="numeric" maxlength="6">
+        <button id="btn-enroll">Turn on 2FA</button>
+      </div>
+    </div>
+
+    <div class="err" id="gate-err"></div>
+  </div>
+</div>
+
+<!-- ---------------- app ---------------- -->
+<main class="wrap" id="app" style="display:none">
+  <h1>Schedule Inspector</h1>
+  <p class="sub">Scheduled, predicted and actual departures, with the boarding curve and
+     prediction trail behind each sailing. Hover a sailing to copy its id.</p>
+
+  <div class="controls">
+    <div><label for="route">Route</label><select id="route"></select></div>
+    <div><label for="date">Service day</label><select id="date"></select></div>
+    <div class="spacer"></div>
+    <div id="status" class="sub" style="margin:0"></div>
+  </div>
+
+  <div class="daybar" id="daybar"></div>
+  <div class="cols" id="cols"></div>
+</main>
+
+<footer><div class="wrap">Internal tool — not linked from the site. Data is WSF telemetry
+  plus FerryOrNot's own derived predictions.</div></footer>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// The anon key is public by design — it identifies the project and nothing more.
+// It is NOT what protects this page: the /schedule function resolves the bearer
+// token to a real user and refuses anything that does not, including this key.
+const SUPABASE_URL = "https://fhodvdsrlbahtxsgptky.supabase.co";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZob2R2ZHNybGJhaHR4c2dwdGt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNDk5NzQsImV4cCI6MjA5OTYyNTk3NH0.Bzq6oTWiHvmrXD2nioqv9eSPYTPI9pZyAWSjuByFrt4";
+const API = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/schedule";
+
+const sb = createClient(SUPABASE_URL, ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const gate = $("gate"), app = $("app");
+
+function showErr(m){ $("gate-err").textContent = m || ""; }
+function show(step){
+  for (const s of ["step-password","step-totp","step-enroll"]) $(s).style.display = "none";
+  if (step) $(step).style.display = "";
+}
+
+// ---- auth ----------------------------------------------------------------
+async function currentLevel(){
+  const { data } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data || {};
+}
+
+async function gateOrApp(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session){ gate.style.display=""; app.style.display="none"; show("step-password"); return; }
+  const lvl = await currentLevel();
+  // aal2 required whenever a TOTP factor exists. If none is enrolled yet, offer it
+  // rather than silently running without 2FA.
+  if (lvl.nextLevel === "aal2" && lvl.currentLevel !== "aal2"){
+    gate.style.display=""; app.style.display="none"; show("step-totp");
+    return;
+  }
+  const { data:factors } = await sb.auth.mfa.listFactors();
+  const verified = (factors?.totp || []).filter(f => f.status === "verified");
+  if (verified.length === 0){ await offerEnroll(); return; }
+  gate.style.display="none"; app.style.display=""; $("signout").style.display="";
+  boot();
+}
+
+// Enrolment is EXPLICIT, not automatic on page load, and that is a correctness
+// requirement rather than a UX preference. Supabase mints a NEW SECRET on every
+// enroll() call, so generating one automatically meant each page load silently
+// invalidated whatever the user had already scanned — their app held an older secret
+// than the server and no code could ever match. Now the QR appears only when asked
+// for, so a scan stays valid for as long as the user is looking at it.
+function offerEnroll(){
+  gate.style.display=""; app.style.display="none"; show("step-enroll"); showErr("");
+  $("enroll-intro").style.display = "";
+  $("enroll-live").style.display = "none";
+}
+
+$("btn-begin").onclick = async () => {
+  showErr(""); $("btn-begin").disabled = true;
+  // An abandoned attempt leaves an UNVERIFIED factor behind, and enroll() refuses a
+  // second factor with the same friendly name — so without this, one incomplete
+  // attempt locks you out of 2FA permanently. Unverified factors are inert.
+  const { data:existing } = await sb.auth.mfa.listFactors();
+  for (const f of (existing?.all || []).filter(x => x.status === "unverified")){
+    await sb.auth.mfa.unenroll({ factorId: f.id });
+  }
+  const { data, error } = await sb.auth.mfa.enroll({ factorType:"totp",
+                                                     friendlyName:"Schedule Inspector" });
+  $("btn-begin").disabled = false;
+  if (error){ showErr(error.message); return; }
+  window.__factorId = data.id;
+  $("qr").src = data.totp.qr_code;
+  $("secret").textContent = data.totp.secret;
+  // Say exactly what the entry will be called, so it can be told apart from any other
+  // Supabase project already in the same authenticator app.
+  try {
+    const u = new URL(data.totp.uri);
+    const issuer = u.searchParams.get("issuer") || "(none)";
+    $("enroll-label").textContent =
+      `Your app will list this as “${decodeURIComponent(u.pathname.replace(/^\/+/,""))}” ` +
+      `(issuer: ${issuer}). Make sure you read the code from THAT entry.`;
+  } catch { /* label is a convenience; never block enrolment on it */ }
+  $("enroll-intro").style.display = "none";
+  $("enroll-live").style.display = "";
+};
+
+$("btn-signin").onclick = async () => {
+  showErr(""); $("btn-signin").disabled = true;
+  const { error } = await sb.auth.signInWithPassword({
+    email: $("email").value.trim(), password: $("password").value });
+  $("btn-signin").disabled = false;
+  if (error){ showErr(error.message); return; }
+  gateOrApp();
+};
+
+$("btn-totp").onclick = async () => {
+  showErr("");
+  const { data:factors } = await sb.auth.mfa.listFactors();
+  const f = (factors?.totp || []).find(x => x.status === "verified");
+  if (!f){ showErr("No verified factor."); return; }
+  const ch = await sb.auth.mfa.challenge({ factorId: f.id });
+  if (ch.error){ showErr(ch.error.message); return; }
+  const v = await sb.auth.mfa.verify({ factorId: f.id, challengeId: ch.data.id,
+                                       code: $("totp").value.trim() });
+  if (v.error){ showErr(v.error.message); return; }
+  gateOrApp();
+};
+
+$("btn-enroll").onclick = async () => {
+  showErr("");
+  const id = window.__factorId;
+  const ch = await sb.auth.mfa.challenge({ factorId: id });
+  if (ch.error){ showErr(ch.error.message); return; }
+  const v = await sb.auth.mfa.verify({ factorId: id, challengeId: ch.data.id,
+                                       code: $("enrollcode").value.trim() });
+  if (v.error){ showErr(v.error.message); return; }
+  gateOrApp();
+};
+
+$("btn-skip").onclick = () => {
+  gate.style.display="none"; app.style.display=""; $("signout").style.display="";
+  boot();
+};
+
+$("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---- data ----------------------------------------------------------------
+async function call(qs){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { gateOrApp(); throw new Error("signed out"); }
+  const res = await fetch(API + (qs || ""), {
+    headers: { Authorization: "Bearer " + session.access_token, apikey: ANON_KEY }});
+  if (res.status === 401){ gateOrApp(); throw new Error("signed out"); }
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+const pacTime = (iso) => iso ? new Date(iso).toLocaleTimeString("en-US",
+  { timeZone:"America/Los_Angeles", hour:"2-digit", minute:"2-digit", hour12:false }) : "—";
+
+function delayClass(m){ if (m == null) return ""; if (m <= 5) return "ok";
+  return m <= 20 ? "warn" : "bad"; }
+
+function sailClass(s){
+  if (!s.actual) return "pending";
+  if (s.delay == null) return "";
+  return s.delay <= 5 ? "ontime" : (s.delay <= 20 ? "late" : "verylate");
+}
+
+// Boarding curve. x = minutes until scheduled departure, counting DOWN to 0, which is
+// the axis the cliff actually happens on. Sales anchors marked because "when did this
+// sailing open" matters more than the slope.
+function curveSVG(s){
+  const all = (s.curve || []).filter(p => p[0] != null && p[1] != null);
+  if (all.length < 2) return '<div class="empty">No boarding reads for this sailing.</div>';
+
+  // AUTO-FIT rather than a fixed window. The collector logs from D-180, so most
+  // sailings carry a long flat zero region that squashes the part worth seeing. But a
+  // fixed cutoff is wrong too: measured over 1357 sailings, trimming at D-60 would
+  // truncate 24% of them and OVER HALF of both Bremerton directions, which open far
+  // earlier than the rest (median first sale D-65 against D-44..50 elsewhere; earliest
+  // observed D-180). So: start just before this sailing's own first sale and let each
+  // chart size itself. Quiet sailings zoom in, early-opening ones keep their curve.
+  const firstSale = all.findIndex(p => p[1] > 0);
+  const LEAD = 3;   // a few reads of context before anything sells
+  const pts = firstSale > LEAD ? all.slice(firstSale - LEAD) : all;
+  const xs = pts.map(p => p[0]);
+  const xMax = Math.max(...xs), xMin = Math.min(...xs);
+  const W = 600, H = 120, PADL = 28, PADB = 18, PADT = 8;
+  const sx = (m) => PADL + (xMax - m) / Math.max(1,(xMax - xMin)) * (W - PADL - 8);
+  const sy = (o) => PADT + (1 - Math.min(100,o)/100) * (H - PADT - PADB);
+  const d = pts.map((p,i) => (i ? "L" : "M") + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join(" ");
+  // Minutes run positive BEFORE the slot and negative after it, because the read ramp
+  // keeps sampling past departure. Render the sign as D−/D+ rather than emitting "D−-4".
+  const dLabel = (m) => m >= 0 ? `D\u2212${m}` : `D+${-m}`;
+  const marks = [];
+  const anchor = (iso, label, colour) => {
+    if (!iso || !s.sched) return;
+    const mins = Math.round((new Date(s.sched) - new Date(iso)) / 60000);
+    if (mins > xMax || mins < xMin) return;
+    const x = sx(mins).toFixed(1);
+    marks.push(`<line x1="${x}" y1="${PADT}" x2="${x}" y2="${H-PADB}" stroke="${colour}"
+      stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="${x}" y="${PADT+9}" font-size="9" fill="${colour}" text-anchor="middle">${label}</text>`);
+  };
+  anchor(s.firstSale, "opened", "var(--muted)");
+  anchor(s.soldOut, "sold out", "var(--bad)");
+  return `<svg class="curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="${PADL}" y1="${sy(100)}" x2="${W-8}" y2="${sy(100)}" stroke="var(--hairline)"/>
+    <line x1="${PADL}" y1="${sy(0)}" x2="${W-8}" y2="${sy(0)}" stroke="var(--hairline)"/>
+    <text x="2" y="${sy(100)+4}" font-size="9" fill="var(--muted)">100%</text>
+    <text x="8" y="${sy(0)+4}" font-size="9" fill="var(--muted)">0</text>
+    <text x="${PADL}" y="${H-4}" font-size="9" fill="var(--muted)">${dLabel(xMax)}</text>
+    <text x="${W-8}" y="${H-4}" font-size="9" fill="var(--muted)" text-anchor="end">${dLabel(xMin)}</text>
+    ${marks.join("")}
+    <path d="${d}" fill="none" stroke="var(--brass)" stroke-width="2"/>
+  </svg>`;
+}
+
+function trailTable(s){
+  if (!s.trail || !s.trail.length)
+    return '<div class="empty">No prediction trail — this sailing departed before ' +
+           'prediction history was recorded, or its prediction never changed.</div>';
+  return `<table class="trail"><thead><tr>
+      <th>Made at</th><th>Lead</th><th>Predicted</th><th>Depth</th><th>Conf</th><th>Basis</th>
+    </tr></thead><tbody>` +
+    s.trail.map(r => `<tr>
+      <td>${pacTime(r.at)}</td>
+      <td class="muted">${r.lead == null ? "—" : (r.lead >= 0 ? "T−"+r.lead+"m" : "T+"+(-r.lead)+"m")}</td>
+      <td>${pacTime(r.depart)}</td>
+      <td class="muted">${r.depth ?? "—"}</td>
+      <td class="muted">${r.conf ?? "—"}</td>
+      <td class="muted">${r.basis ?? "—"}</td>
+    </tr>`).join("") + `</tbody></table>`;
+}
+
+function sailingHTML(s){
+  const occ = s.occupancy;
+  const flags = (s.dq ? s.dq.split(";") : []).map(f => `<span class="flag">${f}</span>`).join("");
+  return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
+    <div class="sailhead" title="${s.id}">
+      <span class="caret">▸</span>
+      <div class="times">
+        <div class="t"><span class="lab">sched</span><span class="val">${pacTime(s.sched)}</span></div>
+        <div class="t pred"><span class="lab">predicted</span><span class="val">${
+          (s.basis||"").includes("OVERDUE") ? "overdue" : pacTime(s.predicted)}</span></div>
+        <div class="t act"><span class="lab">actual</span><span class="val">${pacTime(s.actual)}</span></div>
+        ${s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
+      </div>
+      <div class="occ">
+        ${occ != null ? `<span>${occ}%</span><span class="bar"><i style="width:${Math.min(100,occ)}%"></i></span>` : ""}
+      </div>
+    </div>
+    <div class="body">
+      <div class="kv">
+        <div><span>id</span>${s.id}</div>
+        <div><span>vessel</span>${s.vessel || "—"}</div>
+        <div><span>status</span>${s.status || "—"}</div>
+        <div><span>arrived</span>${pacTime(s.arrived)}</div>
+        <div><span>crossing</span>${s.crossing != null ? s.crossing+" min" : "—"}</div>
+        <div><span>turnaround</span>${s.turnaround != null ? s.turnaround+" min" : "—"}</div>
+        <div><span>drive-up</span>${s.driveUpTotal != null
+              ? (s.driveUpTotal - (s.driveUpRemaining ?? 0)) + " / " + s.driveUpTotal : "—"}</div>
+        <div><span>terminal wait</span>${s.waitHours == null ? "unknown"
+              : (s.waitHours === 0 ? "no extended wait" : s.waitHours + "h")}</div>
+        <div><span>confidence</span>${s.confidence || "—"}${
+              s.depth != null ? ` <span class="muted">(depth ${s.depth})</span>` : ""}</div>
+        <div><span>basis</span>${s.basis || "—"}</div>
+        <div><span>inbound leg</span>${s.inbound || "—"}</div>
+        <div><span>opened / sold out</span>${pacTime(s.firstSale)} / ${
+              s.soldOut ? pacTime(s.soldOut) : "—"}</div>
+      </div>
+      ${flags ? `<div>${flags}</div>` : ""}
+      <div class="sec">Boarding curve</div>
+      ${curveSVG(s)}
+      <div class="sec">Prediction trail</div>
+      ${trailTable(s)}
+    </div>
+  </div>`;
+}
+
+function render(payload){
+  const cols = $("cols");
+  cols.innerHTML = (payload.directions || []).map(d => `
+    <div><div class="coltitle">${d.label} <span class="muted">(${d.sailings.length})</span></div>
+    ${d.sailings.map(sailingHTML).join("")}</div>`).join("");
+
+  const bar = [];
+  for (const w of payload.waits || []){
+    bar.push(`<span class="chip wait">${w.direction} — ${
+      w.hours === 0 ? "wait cleared" : w.hours + "h wait"} @ ${pacTime(w.from)}</span>`);
+  }
+  for (const a of payload.alerts || []){
+    bar.push(`<span class="chip ${a.operational ? "op" : ""}" title="${a.title.replace(/"/g,"&quot;")}">${
+      a.title.length > 74 ? a.title.slice(0,74) + "…" : a.title}</span>`);
+  }
+  $("daybar").innerHTML = bar.join("");
+
+  cols.querySelectorAll(".sailhead").forEach(h => {
+    h.onclick = () => h.parentElement.classList.toggle("open");
+  });
+}
+
+async function load(){
+  const d = $("date").value, r = $("route").value;
+  if (!d || !r) return;
+  $("status").textContent = "Loading…";
+  try {
+    const payload = await call(`?date=${encodeURIComponent(d)}&route=${encodeURIComponent(r)}`);
+    render(payload);
+    const n = (payload.directions||[]).reduce((a,x)=>a+x.sailings.length,0);
+    $("status").textContent = `${n} sailings`;
+  } catch (e) {
+    if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
+  }
+}
+
+async function boot(){
+  try {
+    const meta = await call("");
+    $("route").innerHTML = meta.routes.map(r =>
+      `<option value="${r.routeId}">${r.label}</option>`).join("");
+    $("date").innerHTML = meta.days.map(d => `<option value="${d}">${d}</option>`).join("");
+    $("route").onchange = load; $("date").onchange = load;
+    load();
+  } catch (e) {
+    if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
+  }
+}
+
+sb.auth.onAuthStateChange(() => {});
+gateOrApp();
+</script>
+</body>
+</html>
