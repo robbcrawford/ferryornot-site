@@ -127,10 +127,11 @@
     <div><label for="b-build">Build</label><input id="b-build" type="text" placeholder="16"></div>
     <div><label for="b-device">Device</label><input id="b-device" type="text" placeholder="iPhone 15 Pro, iOS 26"></div>
   </div>
-  <label>Screenshots</label>
-  <div class="warn-box">Screenshots from the app usually show the rider's origin and
-    destination — often a home address — and the pass screen shows their ticket.
-    <strong>Redact before uploading</strong>, especially for anything a beta tester sent you.</div>
+  <label>Screenshots <span class="muted">— yours, not testers'</span></label>
+  <div class="warn-box"><strong>Your own screenshots only.</strong> Tester screenshots
+    stay in TestFlight, where the tester opted in and Apple holds the data — we read
+    them there rather than copying them here. Anything you upload is a development
+    artifact; if a shot happens to show a real origin or destination, redact it.</div>
   <div class="dropzone" id="b-drop">Drop images here, or click to choose</div>
   <input id="b-file" type="file" accept="image/*" multiple hidden>
   <div class="shots" id="b-shots"></div>
