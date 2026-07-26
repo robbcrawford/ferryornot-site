@@ -45,6 +45,28 @@
   .dlg-actions{display:flex;gap:10px;align-items:center;margin-top:16px}
   .dlg-actions .spacer{margin-left:auto}
   .danger{color:var(--bad);border-color:var(--bad)!important}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--hairline);margin:4px 0 18px}
+  .tab{padding:8px 14px;font-size:14.5px;cursor:pointer;color:var(--muted);
+    border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.on{color:var(--brass);border-bottom-color:var(--brass)}
+  .sev{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;
+    padding:1px 6px;white-space:nowrap;border:1px solid currentColor}
+  .sev.crash{color:var(--bad)} .sev.major{color:var(--warn)}
+  .sev.minor{color:var(--muted)} .sev.cosmetic{color:var(--muted);opacity:.7}
+  .shots{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .shots img{height:120px;border-radius:8px;border:1px solid var(--hairline);cursor:zoom-in;
+    background:var(--parchment)}
+  .bugmeta{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .resolved{opacity:.6}
+  .resolved h3{text-decoration:line-through;text-decoration-thickness:1px}
+  .warn-box{border:1px solid var(--warn);border-radius:8px;padding:9px 12px;
+    font-size:12.5px;color:var(--warn);margin:10px 0}
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:none;
+    align-items:center;justify-content:center;padding:30px;cursor:zoom-out}
+  #lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+  .dropzone{border:1px dashed var(--hairline);border-radius:8px;padding:14px;
+    text-align:center;font-size:13px;color:var(--muted);margin-top:6px}
+  .dropzone.over{border-color:var(--brass);color:var(--brass)}
 </style>
 </head>
 <body>
@@ -67,13 +89,59 @@
   <p class="sub">What is done, what is next, and why — across the app, backend and site.
      Editable here; this is the live source of truth for status.</p>
 
+  <div class="tabs">
+    <div class="tab on" data-tab="roadmap">Roadmap</div>
+    <div class="tab" data-tab="bugs">Bugs <span id="bugcount" class="muted"></span></div>
+  </div>
+
+  <div id="pane-roadmap">
   <div class="bars" id="bars"></div>
   <div class="legend" id="legend"></div>
 
   <div class="filters" id="filters"></div>
   <div id="board"></div>
   <button id="add">Add item</button>
+  </div>
+
+  <div id="pane-bugs" hidden>
+    <div id="buglist"></div>
+    <button id="addbug">Report a bug</button>
+  </div>
 </main>
+
+<div id="lightbox"><img alt=""></div>
+
+<dialog id="bugdlg">
+  <h1 style="margin:0 0 14px;font-size:18px" id="bug-title-h">Bug report</h1>
+  <label for="b-title">What went wrong</label>
+  <input id="b-title" type="text">
+  <label for="b-detail">Detail — steps to reproduce, what you expected</label>
+  <textarea id="b-detail"></textarea>
+  <div class="row">
+    <div><label for="b-severity">Severity</label><select id="b-severity" style="width:100%"></select></div>
+    <div><label for="b-status">Status</label><select id="b-status" style="width:100%"></select></div>
+    <div><label for="b-area">Area</label><select id="b-area" style="width:100%"></select></div>
+  </div>
+  <div class="row">
+    <div><label for="b-reporter">Reported by</label><input id="b-reporter" type="text" placeholder="me / tester name"></div>
+    <div><label for="b-build">Build</label><input id="b-build" type="text" placeholder="16"></div>
+    <div><label for="b-device">Device</label><input id="b-device" type="text" placeholder="iPhone 15 Pro, iOS 26"></div>
+  </div>
+  <label>Screenshots</label>
+  <div class="warn-box">Screenshots from the app usually show the rider's origin and
+    destination — often a home address — and the pass screen shows their ticket.
+    <strong>Redact before uploading</strong>, especially for anything a beta tester sent you.</div>
+  <div class="dropzone" id="b-drop">Drop images here, or click to choose</div>
+  <input id="b-file" type="file" accept="image/*" multiple hidden>
+  <div class="shots" id="b-shots"></div>
+  <div class="err" id="b-err"></div>
+  <div class="dlg-actions">
+    <button id="b-save">Save</button>
+    <button id="b-cancel" class="ghost">Cancel</button>
+    <span class="spacer"></span>
+    <button id="b-delete" class="ghost danger">Delete</button>
+  </div>
+</dialog>
 
 <dialog id="dlg">
   <h1 style="margin:0 0 14px;font-size:18px" id="dlg-title">Edit item</h1>
@@ -228,10 +296,155 @@ async function load(){
   render();
 }
 
+// ---------------- bugs ----------------
+const BUGS_API = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/bugs";
+const SEVERITIES = ["crash","major","minor","cosmetic"];
+const BUG_STATUS = [["new","New"],["confirmed","Confirmed"],["fixed","Fixed"],
+                    ["wontfix","By design"],["norepro","Can't reproduce"]];
+const BUG_AREAS = ["app","backend","site"];
+const RESOLVED = new Set(["fixed","wontfix","norepro"]);
+let bugs = [], editingBug = null, pendingShots = [];
+
+async function bugWrite(body, qs = ""){
+  const { data:{ session } } = await sb.auth.getSession();
+  const res = await fetch(BUGS_API + qs, { method:"POST",
+    headers:{ Authorization:"Bearer " + session.access_token, apikey: ANON_KEY,
+              "content-type":"application/json" },
+    body: JSON.stringify(body) });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || ("HTTP " + res.status));
+  return out;
+}
+
+function renderBugs(){
+  const open = bugs.filter(b => !RESOLVED.has(b.status));
+  $("bugcount").textContent = open.length ? open.length : "";
+  if (!bugs.length){
+    $("buglist").innerHTML = '<p class="sub">No bug reports yet.</p>'; return;
+  }
+  $("buglist").innerHTML = bugs.map(b => {
+    const shots = (b.screenshots || []).filter(s => s.url);
+    const label = (BUG_STATUS.find(x => x[0] === b.status) || [,b.status])[1];
+    return `<div class="item ${RESOLVED.has(b.status) ? "resolved" : ""}" data-bug="${b.id}">
+      <span class="sev ${b.severity}">${b.severity}</span>
+      <div class="txt">
+        <h3>${esc(b.title)}</h3>
+        ${b.detail ? `<p>${esc(b.detail)}</p>` : ""}
+        <div class="bugmeta">${label}
+          ${b.reporter ? " · " + esc(b.reporter) : ""}
+          ${b.appBuild ? " · build " + esc(b.appBuild) : ""}
+          ${b.device ? " · " + esc(b.device) : ""}
+          · ${dateOnly(b.createdAt)}</div>
+        ${shots.length ? `<div class="shots">${shots.map(s =>
+          `<img src="${s.url}" alt="screenshot" loading="lazy">`).join("")}</div>` : ""}
+      </div>
+      <div class="acts"><button data-editbug="${b.id}">Edit</button></div>
+    </div>`;
+  }).join("");
+  $("buglist").querySelectorAll("[data-editbug]").forEach(btn =>
+    btn.onclick = () => openBug(bugs.find(x => String(x.id) === btn.dataset.editbug)));
+  $("buglist").querySelectorAll(".shots img").forEach(img =>
+    img.onclick = () => { const lb = $("lightbox");
+      lb.querySelector("img").src = img.src; lb.style.display = "flex"; });
+}
+$("lightbox").onclick = () => $("lightbox").style.display = "none";
+
+function openBug(bug){
+  editingBug = bug || null;
+  // Paths, not URLs: URLs are signed and expire, paths are what we persist.
+  pendingShots = bug ? (bug.screenshots || []).map(s => s.path) : [];
+  $("bug-title-h").textContent = bug ? "Edit bug report" : "New bug report";
+  $("b-title").value = bug?.title ?? "";
+  $("b-detail").value = bug?.detail ?? "";
+  $("b-reporter").value = bug?.reporter ?? "";
+  $("b-build").value = bug?.appBuild ?? "";
+  $("b-device").value = bug?.device ?? "";
+  $("b-severity").innerHTML = SEVERITIES.map(v =>
+    `<option ${bug?.severity === v ? "selected" : ""}>${v}</option>`).join("");
+  $("b-area").innerHTML = BUG_AREAS.map(v =>
+    `<option ${bug?.area === v ? "selected" : ""}>${v}</option>`).join("");
+  $("b-status").innerHTML = BUG_STATUS.map(([v,l]) =>
+    `<option value="${v}" ${bug?.status === v ? "selected" : ""}>${l}</option>`).join("");
+  $("b-delete").style.display = bug ? "" : "none";
+  $("b-err").textContent = "";
+  drawShots(bug);
+  $("bugdlg").showModal();
+}
+
+function drawShots(bug){
+  const signed = bug ? Object.fromEntries((bug.screenshots||[]).map(s => [s.path, s.url])) : {};
+  $("b-shots").innerHTML = pendingShots.map((p,i) =>
+    `<div style="position:relative">
+       <img src="${signed[p] || p}" alt="">
+       <button data-rm="${i}" style="position:absolute;top:4px;right:4px;margin:0;
+         padding:1px 7px;font-size:12px;background:var(--card);color:var(--bad);
+         border:1px solid var(--bad)">×</button>
+     </div>`).join("");
+  $("b-shots").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    pendingShots.splice(Number(b.dataset.rm), 1); drawShots(bug);
+  });
+}
+
+async function uploadFiles(files){
+  $("b-err").textContent = "";
+  for (const f of files){
+    if (!f.type.startsWith("image/")) continue;
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}-${f.name.replace(/[^\w.-]/g,"_")}`;
+    const { error } = await sb.storage.from("bug-screenshots").upload(path, f,
+      { contentType: f.type });
+    if (error){ $("b-err").textContent = error.message; return; }
+    pendingShots.push(path);
+  }
+  // Re-sign so the just-uploaded images are previewable in the dialog.
+  const { data } = await sb.storage.from("bug-screenshots")
+    .createSignedUrls(pendingShots, 900);
+  drawShots({ screenshots: (data||[]).map(d => ({ path:d.path, url:d.signedUrl })) });
+}
+
+$("b-drop").onclick = () => $("b-file").click();
+$("b-file").onchange = (e) => uploadFiles([...e.target.files]);
+["dragover","dragenter"].forEach(ev => $("b-drop").addEventListener(ev, e => {
+  e.preventDefault(); $("b-drop").classList.add("over"); }));
+["dragleave","drop"].forEach(ev => $("b-drop").addEventListener(ev, e => {
+  e.preventDefault(); $("b-drop").classList.remove("over"); }));
+$("b-drop").addEventListener("drop", e => uploadFiles([...e.dataTransfer.files]));
+
+$("addbug").onclick = () => openBug(null);
+$("b-cancel").onclick = () => $("bugdlg").close();
+$("b-save").onclick = async () => {
+  $("b-err").textContent = "";
+  try {
+    await bugWrite({ id: editingBug?.id ?? null, title:$("b-title").value,
+      detail:$("b-detail").value, area:$("b-area").value, severity:$("b-severity").value,
+      status:$("b-status").value, reporter:$("b-reporter").value,
+      appBuild:$("b-build").value, device:$("b-device").value, screenshots: pendingShots });
+    $("bugdlg").close(); await loadBugs();
+  } catch (e) { $("b-err").textContent = e.message; }
+};
+$("b-delete").onclick = async () => {
+  if (!editingBug) return;
+  if (!confirm(`Delete this report and its screenshots?`)) return;
+  try { await bugWrite({}, "?delete=" + editingBug.id); $("bugdlg").close(); await loadBugs(); }
+  catch (e) { $("b-err").textContent = e.message; }
+};
+
+async function loadBugs(){
+  const d = await authedFetch(BUGS_API);
+  bugs = d.bugs || [];
+  renderBugs();
+}
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  $("pane-roadmap").hidden = t.dataset.tab !== "roadmap";
+  $("pane-bugs").hidden = t.dataset.tab !== "bugs";
+});
+
 $("signout").onclick = (e) => { e.preventDefault(); signOut(); };
 await requireAuth();
 $("app").hidden = false;
 load();
+loadBugs();
 </script>
 </body>
 </html>
