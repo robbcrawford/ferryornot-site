@@ -148,8 +148,9 @@
       <img src="/wordmark-light.png" alt="FerryOrNot">
     </picture></span>
   </a>
-  <span class="spacer"></span>
-  <a href="#" id="signout" style="display:none">Sign out</a>
+  <span class="tag">Development</span>
+  <a href="/development/">Dashboard</a>
+  <a href="#" id="signout">Sign out</a>
 </nav></div></header>
 
 <!-- gate is injected by ../auth.js -->
@@ -517,7 +518,6 @@ async function boot(){
 $("signout").onclick = (e) => { e.preventDefault(); signOut(); };
 await requireAuth();
 $("app").style.display = "";
-$("signout").style.display = "";
 boot();
 </script>
 </body>

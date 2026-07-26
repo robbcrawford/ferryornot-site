@@ -66,23 +66,30 @@ export function requireAuth(){
     const host = document.createElement("div");
     host.innerHTML = GATE_HTML;
     const gate = host.firstElementChild;
+    // Hidden until we KNOW a sign-in is needed. getSession() is async, so appending
+    // this visible meant every navigation flashed the login form for a frame or two
+    // before the existing session resolved and removed it.
+    gate.style.display = "none";
     document.body.appendChild(gate);
     const $ = (id) => document.getElementById(id);
-    const step = (name) => gate.querySelectorAll("[data-step]").forEach(
-      (el) => el.hidden = el.dataset.step !== name);
+    const step = (name) => {
+      gate.querySelectorAll("[data-step]").forEach(
+        (el) => el.hidden = el.dataset.step !== name);
+      gate.style.display = "";   // reverts to the stylesheet's flex
+    };
     const err = (m) => $("dg-err").textContent = m || "";
     const done = () => { gate.remove(); resolve(); };
 
     async function check(){
       const { data:{ session } } = await sb.auth.getSession();
-      if (!session){ gate.style.display=""; step("password"); return; }
+      if (!session){ step("password"); return; }
       const { data:lvl } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
       if (lvl?.nextLevel === "aal2" && lvl.currentLevel !== "aal2"){
-        gate.style.display=""; step("totp"); return;
+        step("totp"); return;
       }
       const { data:f } = await sb.auth.mfa.listFactors();
       if (!(f?.totp || []).some(x => x.status === "verified")){
-        gate.style.display=""; step("enroll"); return;
+        step("enroll"); return;
       }
       done();
     }
