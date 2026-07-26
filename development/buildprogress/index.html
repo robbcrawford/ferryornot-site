@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Build Progress — FerryOrNot Development</title>
+<link rel="stylesheet" href="../dev.css">
+<style>
+  .bars{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin:6px 0 4px}
+  .bars i{display:block;height:100%}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);
+    margin-bottom:22px}
+  .legend b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+  .fchip{font-size:12.5px;padding:4px 11px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--hairline);background:var(--card);color:var(--muted)}
+  .fchip.on{border-color:var(--brass);color:var(--brass)}
+  .col{margin-bottom:26px}
+  .colhead{display:flex;align-items:baseline;gap:9px;font-size:13px;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted);padding-bottom:7px;
+    border-bottom:1px solid var(--hairline)}
+  .item{background:var(--card);border:1px solid var(--hairline);border-radius:10px;
+    padding:11px 13px;margin-top:9px;display:flex;gap:12px;align-items:flex-start}
+  .item .txt{flex:1;min-width:0}
+  .item h3{margin:0;font-size:15px;font-weight:600;line-height:1.4}
+  .item p{margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.55}
+  .area{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    border:1px solid var(--hairline);border-radius:5px;padding:1px 6px;color:var(--muted);
+    white-space:nowrap}
+  .when{font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .acts{display:flex;gap:6px;opacity:0;transition:opacity .12s}
+  .item:hover .acts{opacity:1}
+  .acts button{margin:0;padding:3px 9px;font-size:12px;background:transparent;
+    color:var(--muted);border:1px solid var(--hairline)}
+  .acts button:hover{color:var(--brass);border-color:var(--brass)}
+  .done h3{opacity:.72}
+  dialog{border:1px solid var(--hairline);border-radius:12px;background:var(--card);
+    color:var(--ink);padding:20px;max-width:520px;width:92%}
+  dialog::backdrop{background:rgba(0,0,0,.5)}
+  dialog textarea{width:100%;min-height:80px;padding:9px 11px;border:1px solid var(--hairline);
+    border-radius:8px;background:var(--parchment);color:var(--ink);font:inherit;font-size:14px}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  .dlg-actions{display:flex;gap:10px;align-items:center;margin-top:16px}
+  .dlg-actions .spacer{margin-left:auto}
+  .danger{color:var(--bad);border-color:var(--bad)!important}
+</style>
+</head>
+<body>
+
+<header><div class="wrap"><nav>
+  <a class="brand" href="/" aria-label="FerryOrNot home">
+    <img class="mark" src="/app-icon.png" alt="">
+    <span class="wordmark"><picture>
+      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="/wordmark-light.png" alt="FerryOrNot">
+    </picture></span>
+  </a>
+  <span class="tag">Development</span>
+  <a href="/development/">Dashboard</a>
+  <a href="#" id="signout">Sign out</a>
+</nav></div></header>
+
+<main class="wrap" id="app" hidden>
+  <h1>Build Progress</h1>
+  <p class="sub">What is done, what is next, and why — across the app, backend and site.
+     Editable here; this is the live source of truth for status.</p>
+
+  <div class="bars" id="bars"></div>
+  <div class="legend" id="legend"></div>
+
+  <div class="filters" id="filters"></div>
+  <div id="board"></div>
+  <button id="add">Add item</button>
+</main>
+
+<dialog id="dlg">
+  <h1 style="margin:0 0 14px;font-size:18px" id="dlg-title">Edit item</h1>
+  <label for="f-title">Title</label>
+  <input id="f-title" type="text">
+  <label for="f-detail">Detail <span class="muted">— the why, not just the what</span></label>
+  <textarea id="f-detail"></textarea>
+  <div class="row">
+    <div><label for="f-area">Area</label><select id="f-area" style="width:100%"></select></div>
+    <div><label for="f-status">Status</label><select id="f-status" style="width:100%"></select></div>
+  </div>
+  <div class="err" id="f-err"></div>
+  <div class="dlg-actions">
+    <button id="f-save">Save</button>
+    <button id="f-cancel" class="ghost">Cancel</button>
+    <span class="spacer"></span>
+    <button id="f-delete" class="ghost danger">Delete</button>
+  </div>
+</dialog>
+
+<footer><div class="wrap">Status lives here rather than in DEVELOPMENT.md, which keeps
+  the reasoning and architecture. Prose drifts; this does not.</div></footer>
+
+<script type="module">
+import { requireAuth, authedFetch, sb, ANON_KEY, signOut } from "../auth.js";
+const API = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/buildprogress";
+const $ = (id) => document.getElementById(id);
+
+const STATUSES = [
+  { key:"doing", label:"In progress", colour:"var(--brass)" },
+  { key:"next",  label:"Next",        colour:"var(--warn)" },
+  { key:"later", label:"Later",       colour:"var(--muted)" },
+  { key:"idea",  label:"Ideas",       colour:"var(--hairline)" },
+  { key:"done",  label:"Done",        colour:"var(--ok)" },
+];
+const AREAS = ["app","backend","site","design","ops"];
+let items = [], areaFilter = null;
+
+async function write(body, qs = ""){
+  const { data:{ session } } = await sb.auth.getSession();
+  const res = await fetch(API + qs, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + session.access_token, apikey: ANON_KEY,
+               "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const out = await res.json();
+  if (!res.ok) throw new Error(out.error || ("HTTP " + res.status));
+  return out;
+}
+
+const esc = (t) => (t ?? "").replace(/[<>&]/g, c => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;" }[c]));
+const dateOnly = (iso) => iso ? new Date(iso).toISOString().slice(0,10) : "";
+
+function summary(){
+  const counts = Object.fromEntries(STATUSES.map(s => [s.key, 0]));
+  for (const i of items) counts[i.status] = (counts[i.status] || 0) + 1;
+  const total = items.length || 1;
+  // Done first so the bar reads as progress from the left.
+  const order = ["done","doing","next","later","idea"];
+  $("bars").innerHTML = order.map(k => {
+    const s = STATUSES.find(x => x.key === k);
+    return `<i style="width:${100*counts[k]/total}%;background:${s.colour}"></i>`;
+  }).join("");
+  $("legend").innerHTML = order.map(k => {
+    const s = STATUSES.find(x => x.key === k);
+    return `<span><span class="dot" style="background:${s.colour}"></span>${s.label}
+      <b>${counts[k]}</b></span>`;
+  }).join("") + `<span class="muted">${counts.done} of ${items.length} complete</span>`;
+}
+
+function filters(){
+  $("filters").innerHTML =
+    [`<span class="fchip ${areaFilter ? "" : "on"}" data-area="">All areas</span>`]
+    .concat(AREAS.map(a => {
+      const n = items.filter(i => i.area === a).length;
+      return n ? `<span class="fchip ${areaFilter === a ? "on" : ""}" data-area="${a}">${a} ${n}</span>` : "";
+    })).join("");
+  $("filters").querySelectorAll(".fchip").forEach(c => c.onclick = () => {
+    areaFilter = c.dataset.area || null; render();
+  });
+}
+
+function render(){
+  summary(); filters();
+  const shown = areaFilter ? items.filter(i => i.area === areaFilter) : items;
+  $("board").innerHTML = STATUSES.map(s => {
+    const list = shown.filter(i => i.status === s.key);
+    if (!list.length) return "";
+    return `<div class="col">
+      <div class="colhead"><span class="dot" style="background:${s.colour}"></span>
+        ${s.label} <span class="muted">${list.length}</span></div>
+      ${list.map(i => `
+        <div class="item ${i.status === "done" ? "done" : ""}" data-id="${i.id}">
+          <span class="area">${i.area}</span>
+          <div class="txt">
+            <h3>${esc(i.title)}</h3>
+            ${i.detail ? `<p>${esc(i.detail)}</p>` : ""}
+          </div>
+          ${i.completedAt ? `<span class="when">${dateOnly(i.completedAt)}</span>` : ""}
+          <div class="acts"><button data-edit="${i.id}">Edit</button></div>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+  $("board").querySelectorAll("[data-edit]").forEach(b =>
+    b.onclick = () => openDialog(items.find(x => String(x.id) === b.dataset.edit)));
+}
+
+let editing = null;
+function openDialog(item){
+  editing = item || null;
+  $("dlg-title").textContent = item ? "Edit item" : "New item";
+  $("f-title").value = item?.title ?? "";
+  $("f-detail").value = item?.detail ?? "";
+  $("f-area").innerHTML = AREAS.map(a =>
+    `<option ${item?.area === a ? "selected" : ""}>${a}</option>`).join("");
+  $("f-status").innerHTML = STATUSES.map(s =>
+    `<option value="${s.key}" ${item?.status === s.key ? "selected" : ""}>${s.label}</option>`).join("");
+  $("f-delete").style.display = item ? "" : "none";
+  $("f-err").textContent = "";
+  $("dlg").showModal();
+}
+
+$("add").onclick = () => openDialog(null);
+$("f-cancel").onclick = () => $("dlg").close();
+$("f-save").onclick = async () => {
+  $("f-err").textContent = "";
+  try {
+    await write({
+      id: editing?.id ?? null,
+      area: $("f-area").value,
+      title: $("f-title").value,
+      detail: $("f-detail").value,
+      status: $("f-status").value,
+      // New items sort to the end of their column; existing keep their place.
+      sortOrder: editing?.sortOrder ?? (Math.max(0, ...items.map(i => i.sortOrder || 0)) + 10),
+    });
+    $("dlg").close();
+    await load();
+  } catch (e) { $("f-err").textContent = e.message; }
+};
+$("f-delete").onclick = async () => {
+  if (!editing) return;
+  if (!confirm(`Delete “${editing.title}”?`)) return;
+  try { await write({}, "?delete=" + editing.id); $("dlg").close(); await load(); }
+  catch (e) { $("f-err").textContent = e.message; }
+};
+
+async function load(){
+  const data = await authedFetch(API);
+  items = data.items || [];
+  render();
+}
+
+$("signout").onclick = (e) => { e.preventDefault(); signOut(); };
+await requireAuth();
+$("app").hidden = false;
+load();
+</script>
+</body>
+</html>

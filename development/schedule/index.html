@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Schedule Inspector — FerryOrNot</title>
 <meta name="description" content="Internal tool.">
+<link rel="stylesheet" href="../dev.css">
 <style>
   :root{
     --parchment:#F6F1E6; --card:#FFFEF8; --ink:#1B2A41; --brass:#9C7A32;
@@ -32,23 +33,6 @@
   .sub{color:var(--muted);font-size:14px;margin:0 0 20px}
   footer{border-top:1px solid var(--hairline);margin-top:40px;padding:20px 0 26px;
     color:var(--muted);font-size:13px}
-
-  /* ---- gate ---- */
-  #gate{max-width:380px;margin:60px auto}
-  #gate .card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:22px}
-  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
-  input[type=email],input[type=password],input[type=text]{width:100%;padding:9px 11px;
-    border:1px solid var(--hairline);border-radius:8px;background:var(--parchment);
-    color:var(--ink);font-size:15px}
-  button{background:var(--brass);color:var(--card);border:0;border-radius:8px;
-    padding:9px 16px;font-size:15px;cursor:pointer;margin-top:16px}
-  button.ghost{background:transparent;color:var(--brass);border:1px solid var(--hairline)}
-  button:disabled{opacity:.5;cursor:default}
-  .err{color:var(--bad);font-size:13.5px;margin-top:10px;min-height:19px}
-  .qr{margin:14px 0;text-align:center}
-  .qr img{max-width:190px;background:#fff;padding:8px;border-radius:8px}
-  code.secret{display:block;word-break:break-all;font-size:12px;color:var(--muted);
-    background:var(--parchment);padding:8px;border-radius:6px;margin-top:8px}
 
   /* ---- controls ---- */
   .controls{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;
@@ -168,55 +152,7 @@
   <a href="#" id="signout" style="display:none">Sign out</a>
 </nav></div></header>
 
-<!-- ---------------- gate ---------------- -->
-<div id="gate" style="display:none">
-  <div class="card">
-    <h1 style="margin-top:0">Schedule Inspector</h1>
-    <p class="sub">Internal tool. Sign-in required.</p>
-
-    <div id="step-password">
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username">
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password">
-      <button id="btn-signin">Sign in</button>
-    </div>
-
-    <div id="step-totp" style="display:none">
-      <p class="sub">Enter the 6-digit code from your authenticator app.</p>
-      <label for="totp">Authentication code</label>
-      <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
-      <button id="btn-totp">Verify</button>
-    </div>
-
-    <div id="step-enroll" style="display:none">
-      <p class="sub">Two-factor authentication is not set up yet.</p>
-      <div id="enroll-intro">
-        <p class="sub"><strong>Before you start:</strong> delete any half-finished
-          “Schedule Inspector” or “Supabase” entry for this account from your
-          authenticator app first — a stale entry holds an old secret and its codes
-          will never be accepted.</p>
-        <p class="sub">Generating a QR replaces any previous one, so scan and verify in
-          a single sitting. <strong>Reloading this page invalidates the code you just
-          scanned.</strong></p>
-        <button id="btn-begin">Generate a QR code</button>
-        <button id="btn-skip" class="ghost">Skip for now</button>
-      </div>
-      <div id="enroll-live" style="display:none">
-        <div class="qr"><img id="qr" alt="TOTP QR code"></div>
-        <p class="sub" id="enroll-label" style="text-align:center;font-size:12.5px"></p>
-        <code class="secret" id="secret"></code>
-        <label for="enrollcode">Code from the app</label>
-        <input id="enrollcode" type="text" inputmode="numeric" maxlength="6">
-        <button id="btn-enroll">Turn on 2FA</button>
-      </div>
-    </div>
-
-    <div class="err" id="gate-err"></div>
-  </div>
-</div>
-
-<!-- ---------------- app ---------------- -->
+<!-- gate is injected by ../auth.js -->
 <main class="wrap" id="app" style="display:none">
   <h1>Schedule Inspector</h1>
   <p class="sub">Scheduled, predicted and actual departures, with the boarding curve and
@@ -241,139 +177,13 @@
   plus FerryOrNot's own derived predictions.</div></footer>
 
 <script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth, authedFetch, signOut } from "../auth.js";
 
-// The anon key is public by design — it identifies the project and nothing more.
-// It is NOT what protects this page: the /schedule function resolves the bearer
-// token to a real user and refuses anything that does not, including this key.
-const SUPABASE_URL = "https://fhodvdsrlbahtxsgptky.supabase.co";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZob2R2ZHNybGJhaHR4c2dwdGt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNDk5NzQsImV4cCI6MjA5OTYyNTk3NH0.Bzq6oTWiHvmrXD2nioqv9eSPYTPI9pZyAWSjuByFrt4";
 const API = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/schedule";
-
-const sb = createClient(SUPABASE_URL, ANON_KEY);
 const $ = (id) => document.getElementById(id);
-const gate = $("gate"), app = $("app");
-
-function showErr(m){ $("gate-err").textContent = m || ""; }
-function show(step){
-  for (const s of ["step-password","step-totp","step-enroll"]) $(s).style.display = "none";
-  if (step) $(step).style.display = "";
-}
-
-// ---- auth ----------------------------------------------------------------
-async function currentLevel(){
-  const { data } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
-  return data || {};
-}
-
-async function gateOrApp(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if (!session){ gate.style.display=""; app.style.display="none"; show("step-password"); return; }
-  const lvl = await currentLevel();
-  // aal2 required whenever a TOTP factor exists. If none is enrolled yet, offer it
-  // rather than silently running without 2FA.
-  if (lvl.nextLevel === "aal2" && lvl.currentLevel !== "aal2"){
-    gate.style.display=""; app.style.display="none"; show("step-totp");
-    return;
-  }
-  const { data:factors } = await sb.auth.mfa.listFactors();
-  const verified = (factors?.totp || []).filter(f => f.status === "verified");
-  if (verified.length === 0){ await offerEnroll(); return; }
-  gate.style.display="none"; app.style.display=""; $("signout").style.display="";
-  boot();
-}
-
-// Enrolment is EXPLICIT, not automatic on page load, and that is a correctness
-// requirement rather than a UX preference. Supabase mints a NEW SECRET on every
-// enroll() call, so generating one automatically meant each page load silently
-// invalidated whatever the user had already scanned — their app held an older secret
-// than the server and no code could ever match. Now the QR appears only when asked
-// for, so a scan stays valid for as long as the user is looking at it.
-function offerEnroll(){
-  gate.style.display=""; app.style.display="none"; show("step-enroll"); showErr("");
-  $("enroll-intro").style.display = "";
-  $("enroll-live").style.display = "none";
-}
-
-$("btn-begin").onclick = async () => {
-  showErr(""); $("btn-begin").disabled = true;
-  // An abandoned attempt leaves an UNVERIFIED factor behind, and enroll() refuses a
-  // second factor with the same friendly name — so without this, one incomplete
-  // attempt locks you out of 2FA permanently. Unverified factors are inert.
-  const { data:existing } = await sb.auth.mfa.listFactors();
-  for (const f of (existing?.all || []).filter(x => x.status === "unverified")){
-    await sb.auth.mfa.unenroll({ factorId: f.id });
-  }
-  const { data, error } = await sb.auth.mfa.enroll({ factorType:"totp",
-                                                     friendlyName:"Schedule Inspector" });
-  $("btn-begin").disabled = false;
-  if (error){ showErr(error.message); return; }
-  window.__factorId = data.id;
-  $("qr").src = data.totp.qr_code;
-  $("secret").textContent = data.totp.secret;
-  // Say exactly what the entry will be called, so it can be told apart from any other
-  // Supabase project already in the same authenticator app.
-  try {
-    const u = new URL(data.totp.uri);
-    const issuer = u.searchParams.get("issuer") || "(none)";
-    $("enroll-label").textContent =
-      `Your app will list this as “${decodeURIComponent(u.pathname.replace(/^\/+/,""))}” ` +
-      `(issuer: ${issuer}). Make sure you read the code from THAT entry.`;
-  } catch { /* label is a convenience; never block enrolment on it */ }
-  $("enroll-intro").style.display = "none";
-  $("enroll-live").style.display = "";
-};
-
-$("btn-signin").onclick = async () => {
-  showErr(""); $("btn-signin").disabled = true;
-  const { error } = await sb.auth.signInWithPassword({
-    email: $("email").value.trim(), password: $("password").value });
-  $("btn-signin").disabled = false;
-  if (error){ showErr(error.message); return; }
-  gateOrApp();
-};
-
-$("btn-totp").onclick = async () => {
-  showErr("");
-  const { data:factors } = await sb.auth.mfa.listFactors();
-  const f = (factors?.totp || []).find(x => x.status === "verified");
-  if (!f){ showErr("No verified factor."); return; }
-  const ch = await sb.auth.mfa.challenge({ factorId: f.id });
-  if (ch.error){ showErr(ch.error.message); return; }
-  const v = await sb.auth.mfa.verify({ factorId: f.id, challengeId: ch.data.id,
-                                       code: $("totp").value.trim() });
-  if (v.error){ showErr(v.error.message); return; }
-  gateOrApp();
-};
-
-$("btn-enroll").onclick = async () => {
-  showErr("");
-  const id = window.__factorId;
-  const ch = await sb.auth.mfa.challenge({ factorId: id });
-  if (ch.error){ showErr(ch.error.message); return; }
-  const v = await sb.auth.mfa.verify({ factorId: id, challengeId: ch.data.id,
-                                       code: $("enrollcode").value.trim() });
-  if (v.error){ showErr(v.error.message); return; }
-  gateOrApp();
-};
-
-$("btn-skip").onclick = () => {
-  gate.style.display="none"; app.style.display=""; $("signout").style.display="";
-  boot();
-};
-
-$("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
 
 // ---- data ----------------------------------------------------------------
-async function call(qs){
-  const { data:{ session } } = await sb.auth.getSession();
-  if (!session) { gateOrApp(); throw new Error("signed out"); }
-  const res = await fetch(API + (qs || ""), {
-    headers: { Authorization: "Bearer " + session.access_token, apikey: ANON_KEY }});
-  if (res.status === 401){ gateOrApp(); throw new Error("signed out"); }
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
-}
+const call = (qs) => authedFetch(API + (qs || ""));
 
 const pacTime = (iso) => iso ? new Date(iso).toLocaleTimeString("en-US",
   { timeZone:"America/Los_Angeles", hour:"2-digit", minute:"2-digit", hour12:false }) : "—";
@@ -704,8 +514,11 @@ async function boot(){
   }
 }
 
-sb.auth.onAuthStateChange(() => {});
-gateOrApp();
+$("signout").onclick = (e) => { e.preventDefault(); signOut(); };
+await requireAuth();
+$("app").style.display = "";
+$("signout").style.display = "";
+boot();
 </script>
 </body>
 </html>

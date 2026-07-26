@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Development — FerryOrNot</title>
+<link rel="stylesheet" href="dev.css">
+</head>
+<body>
+
+<header><div class="wrap"><nav>
+  <a class="brand" href="/" aria-label="FerryOrNot home">
+    <img class="mark" src="/app-icon.png" alt="">
+    <span class="wordmark"><picture>
+      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="/wordmark-light.png" alt="FerryOrNot">
+    </picture></span>
+  </a>
+  <span class="tag">Development</span>
+  <a href="#" id="signout">Sign out</a>
+</nav></div></header>
+
+<main class="wrap" id="app" hidden>
+  <h1>Development</h1>
+  <p class="sub">Internal tools. Not linked from the public site, and each one requires
+     this sign-in.</p>
+
+  <div class="tiles">
+    <a class="tile" href="/development/track/">
+      <h2>Vessel Tracker</h2>
+      <p>Scrub through a day of whole-fleet positions on a map. Every vessel, every
+         minute, from the raw telemetry log.</p>
+      <div class="meta" id="m-track">—</div>
+    </a>
+    <a class="tile" href="/development/schedule/">
+      <h2>Schedule Inspector</h2>
+      <p>Scheduled, predicted and actual departures on a shared timeline, with the
+         boarding curve and prediction trail behind each sailing.</p>
+      <div class="meta" id="m-schedule">—</div>
+    </a>
+    <a class="tile" href="/development/buildprogress/">
+      <h2>Build Progress</h2>
+      <p>What is done, what is next, and why — across the app and the backend.
+         Editable in place.</p>
+      <div class="meta" id="m-build">—</div>
+    </a>
+  </div>
+</main>
+
+<footer><div class="wrap">Internal tooling for FerryOrNot. Data is WSF telemetry plus
+  FerryOrNot's own derived predictions.</div></footer>
+
+<script type="module">
+import { requireAuth, authedFetch, signOut } from "./auth.js";
+const $ = (id) => document.getElementById(id);
+$("signout").onclick = (e) => { e.preventDefault(); signOut(); };
+
+await requireAuth();
+$("app").hidden = false;
+
+// A live line under each tile, so the dashboard says whether the thing behind it is
+// actually running rather than just linking to it.
+try {
+  const meta = await authedFetch("https://fhodvdsrlbahtxsgptky.functions.supabase.co/schedule");
+  const days = meta.days || [];
+  $("m-schedule").textContent = days.length
+    ? `${days.length} service days · latest ${days[0]}` : "no data yet";
+  $("m-track").textContent = days.length ? `latest ${days[0]}` : "—";
+} catch (e) {
+  $("m-schedule").textContent = "backend unreachable";
+}
+try {
+  const b = await authedFetch("https://fhodvdsrlbahtxsgptky.functions.supabase.co/buildprogress");
+  const items = b.items || [];
+  const done = items.filter(i => i.status === "done").length;
+  $("m-build").textContent = `${done} done · ${items.length - done} open`;
+} catch (e) {
+  $("m-build").textContent = "not set up yet";
+}
+</script>
+</body>
+</html>

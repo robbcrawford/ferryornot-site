@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Vessel Tracker — FerryOrNot</title>
+<title>Vessel Tracker — FerryOrNot Development</title>
 <meta name="description" content="Scrub through a day of Washington State Ferries vessel positions.">
+<link rel="stylesheet" href="../dev.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
@@ -90,8 +91,9 @@
       <img src="/wordmark-light.png" alt="FerryOrNot">
     </picture></span>
   </a>
-  <a href="/support">Support</a>
-  <a href="/privacy">Privacy</a>
+  <span class="tag">Development</span>
+  <a href="/development/">Dashboard</a>
+  <a href="#" id="devsignout">Sign out</a>
 </nav></div></header>
 
 <main class="wrap">
@@ -125,6 +127,15 @@
   <a href="/privacy">Privacy Policy</a> · <a href="/support">Support</a>
 </div></footer>
 
+<script type="module">
+  // Sign-in gate. Note this guards the PAGE, not the /track endpoint: that one serves
+  // WSF's own public vessel telemetry and is deliberately unauthenticated. Everything
+  // under /development sits behind one login for consistency.
+  import { requireAuth, signOut } from "../auth.js";
+  await requireAuth();
+  document.getElementById("devsignout").onclick = (e) => { e.preventDefault(); signOut(); };
+  document.body.dataset.ready = "1";
+</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>

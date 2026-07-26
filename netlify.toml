@@ -17,6 +17,17 @@
   status = 301
   force = true
 
+# The development tools moved under /development. Keep old links working.
+[[redirects]]
+  from = "/track/*"
+  to = "/development/track/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/schedule/*"
+  to = "/development/schedule/:splat"
+  status = 301
+
 [[headers]]
   for = "/*"
   [headers.values]
