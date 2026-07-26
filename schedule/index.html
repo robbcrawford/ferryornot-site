@@ -110,6 +110,15 @@
   .muted{color:var(--muted)}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
   svg.curve{width:100%;height:120px;display:block}
+  .dir{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+    border:1px solid var(--hairline);border-radius:5px;padding:1px 6px;white-space:nowrap}
+  /* The gap between one leg arriving and the next departing — the quantity the
+     turnaround model predicts, shown where it actually happens. */
+  .turn{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
+    padding:5px 0 5px 16px;border-left:2px dotted var(--hairline);margin-left:14px}
+  .turn b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .swap{font-size:11.5px;padding:2px 7px;border-radius:5px;margin-left:6px;
+    background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
 </style>
 </head>
 <body>
@@ -183,6 +192,10 @@
   <div class="controls">
     <div><label for="route">Route</label><select id="route"></select></div>
     <div><label for="date">Service day</label><select id="date"></select></div>
+    <div><label for="groupby">Group by</label><select id="groupby">
+      <option value="terminal">Direction</option>
+      <option value="vessel">Vessel</option>
+    </select></div>
     <div class="spacer"></div>
     <div id="status" class="sub" style="margin:0"></div>
   </div>
@@ -408,18 +421,26 @@ function trailTable(s){
     </tr>`).join("") + `</tbody></table>`;
 }
 
-function sailingHTML(s){
+function sailingHTML(s, showDir){
   const occ = s.occupancy;
   const flags = (s.dq ? s.dq.split(";") : []).map(f => `<span class="flag">${f}</span>`).join("");
+  // A substitution is worth seeing: a swap and a cancellation are opposite rider
+  // outcomes, and only the swap leaves the boat still coming.
+  const swapped = s.vesselId && s.plannedVesselId &&
+                  String(s.vesselId) !== String(s.plannedVesselId);
+  const swapBadge = swapped
+    ? `<span class="swap">in for ${s.plannedVessel || s.plannedVesselId}</span>` : "";
   return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
     <div class="sailhead" title="${s.id}">
       <span class="caret">▸</span>
+      ${showDir ? `<span class="dir">${s.dirLabel}</span>` : ""}
       <div class="times">
         <div class="t"><span class="lab">sched</span><span class="val">${pacTime(s.sched)}</span></div>
         <div class="t pred"><span class="lab">predicted</span><span class="val">${
           (s.basis||"").includes("OVERDUE") ? "overdue" : pacTime(s.predicted)}</span></div>
         <div class="t act"><span class="lab">actual</span><span class="val">${pacTime(s.actual)}</span></div>
         ${s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
+        ${swapBadge}
       </div>
       <div class="occ">
         ${occ != null ? `<span>${occ}%</span><span class="bar"><i style="width:${Math.min(100,occ)}%"></i></span>` : ""}
@@ -453,11 +474,72 @@ function sailingHTML(s){
   </div>`;
 }
 
+// Grouping by VESSEL rather than by direction. The prediction model is vessel-follow
+// — each sailing's departure is the previous leg's arrival plus a turnaround — so a
+// per-terminal layout splits exactly the chain you need to read, putting a leg and
+// its own inbound in different columns.
+//
+// Sailings are keyed on the ACTUAL vessel where one exists and the PLANNED vessel
+// otherwise, because vessel_id is only written at departure: without the fallback,
+// every not-yet-departed sailing (the half carrying the predictions) would collapse
+// into one "unassigned" column.
+function groupsFor(payload, mode){
+  const all = [];
+  for (const d of payload.directions || []){
+    for (const s of d.sailings) all.push({ ...s, dirCode: d.code, dirLabel: d.label });
+  }
+  if (mode !== "vessel"){
+    return (payload.directions || []).map(d => ({
+      label: d.label,
+      sailings: d.sailings.map(s => ({ ...s, dirCode: d.code, dirLabel: d.label })),
+      showDir: false
+    }));
+  }
+  const by = new Map();
+  for (const s of all){
+    const id = s.vesselId ?? s.plannedVesselId;
+    const key = id == null ? "unassigned" : String(id);
+    if (!by.has(key)) by.set(key, { id, name: s.vessel || s.plannedVessel, sailings: [] });
+    const g = by.get(key);
+    if (!g.name) g.name = s.vessel || s.plannedVessel;
+    g.sailings.push(s);
+  }
+  return [...by.values()]
+    .map(g => ({
+      label: (g.name || `Vessel ${g.id ?? "?"}`) + (g.id != null ? ` · ${g.id}` : ""),
+      sailings: g.sailings.sort((a,b) => new Date(a.sched) - new Date(b.sched)),
+      showDir: true
+    }))
+    .sort((a,b) => a.label.localeCompare(b.label));
+}
+
+// The layover between the previous leg arriving and this one departing. Shown only in
+// vessel mode, where consecutive blocks are genuinely consecutive legs of one boat.
+function turnHTML(prev, s){
+  if (!prev) return "";
+  const from = prev.arrived, to = s.actual || s.predicted;
+  if (!from || !to) return "";
+  const mins = Math.round((new Date(to) - new Date(from)) / 60000);
+  if (mins < 0 || mins > 240) return "";
+  const modelled = s.turnaround != null ? ` <span class="muted">(recorded ${s.turnaround}m)</span>` : "";
+  return `<div class="turn">↳ <b>${mins} min</b> at berth${modelled}${
+    s.actual ? "" : ' <span class="muted">— predicted</span>'}</div>`;
+}
+
 function render(payload){
   const cols = $("cols");
-  cols.innerHTML = (payload.directions || []).map(d => `
-    <div><div class="coltitle">${d.label} <span class="muted">(${d.sailings.length})</span></div>
-    ${d.sailings.map(sailingHTML).join("")}</div>`).join("");
+  const mode = $("groupby").value;
+  const groups = groupsFor(payload, mode);
+  cols.style.gridTemplateColumns = `repeat(${Math.min(groups.length || 1, 3)}, 1fr)`;
+  cols.innerHTML = groups.map(g => {
+    let prev = null;
+    const body = g.sailings.map(s => {
+      const html = (mode === "vessel" ? turnHTML(prev, s) : "") + sailingHTML(s, g.showDir);
+      prev = s;
+      return html;
+    }).join("");
+    return `<div><div class="coltitle">${g.label} <span class="muted">(${g.sailings.length})</span></div>${body}</div>`;
+  }).join("");
 
   const bar = [];
   for (const w of payload.waits || []){
@@ -481,6 +563,7 @@ async function load(){
   $("status").textContent = "Loading…";
   try {
     const payload = await call(`?date=${encodeURIComponent(d)}&route=${encodeURIComponent(r)}`);
+    window.__payload = payload;
     render(payload);
     const n = (payload.directions||[]).reduce((a,x)=>a+x.sailings.length,0);
     $("status").textContent = `${n} sailings`;
@@ -496,6 +579,8 @@ async function boot(){
       `<option value="${r.routeId}">${r.label}</option>`).join("");
     $("date").innerHTML = meta.days.map(d => `<option value="${d}">${d}</option>`).join("");
     $("route").onchange = load; $("date").onchange = load;
+    // Grouping is a view of data already in hand — re-render, do not refetch.
+    $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
     load();
   } catch (e) {
     if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
