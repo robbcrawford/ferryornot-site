@@ -92,6 +92,7 @@
   <div class="tabs">
     <div class="tab on" data-tab="roadmap">Roadmap</div>
     <div class="tab" data-tab="bugs">Bugs <span id="bugcount" class="muted"></span></div>
+    <div class="tab" data-tab="asc">TestFlight <span id="asccount" class="muted"></span></div>
   </div>
 
   <div id="pane-roadmap">
@@ -106,6 +107,13 @@
   <div id="pane-bugs" hidden>
     <div id="buglist"></div>
     <button id="addbug">Report a bug</button>
+  </div>
+
+  <div id="pane-asc" hidden>
+    <p class="sub" style="margin:0 0 6px">Events App Store Connect pushed to us. Feedback
+       also emails on arrival; build and review-state changes land here only.
+       <b>Content stays in TestFlight</b> — open it there.</p>
+    <div id="asclist"></div>
   </div>
 </main>
 
@@ -295,6 +303,72 @@ async function load(){
   const data = await authedFetch(API);
   items = data.items || [];
   render();
+  ascEvents = data.ascEvents || [];   // rides along on the same fetch
+  renderAsc();
+}
+
+// ---------------- App Store Connect events ----------------
+const ASC_APP_ID = "6782129413";
+const TF_FEEDBACK_URL = `https://appstoreconnect.apple.com/apps/${ASC_APP_ID}/testflight/feedback`;
+let ascEvents = [];
+
+// Apple's camelCase event names, in human. Anything unmapped falls back to the raw
+// name rather than being hidden — a new event type we don't recognise is exactly the
+// thing worth seeing.
+const ASC_LABELS = {
+  betaFeedbackScreenshotSubmissionCreated: ["Tester feedback", "screenshot"],
+  betaFeedbackCrashSubmissionCreated:      ["Tester crash report", "crash"],
+  buildUploadStateUpdated:                 ["Build processing", "build"],
+  buildBetaDetailExternalBuildStateUpdated:["TestFlight review state", "build"],
+  appStoreVersionAppVersionStateUpdated:   ["App Store review state", "review"],
+};
+
+const ascWhen = (iso) => iso
+  ? new Date(iso).toLocaleString("en-US", { timeZone:"America/Los_Angeles",
+      month:"short", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false })
+  : "";
+
+function renderAsc(){
+  const feedback = ascEvents.filter(e => e.is_feedback);
+  $("asccount").textContent = feedback.length ? feedback.length : "";
+
+  if (!ascEvents.length){
+    $("asclist").innerHTML = '<p class="sub">Nothing pending. New events appear here as Apple sends them.</p>';
+    return;
+  }
+  $("asclist").innerHTML = ascEvents.map(e => {
+    const [label, kind] = ASC_LABELS[e.event_type] || [e.event_type || "Unknown event", "other"];
+    // A notify_error on a row that DID send means it reached the fallback address —
+    // delivered, but not where it was meant to go. Worth showing, not worth alarming.
+    const mail = !e.is_feedback ? ""
+      : e.notified_at
+        ? `<div class="bugmeta">emailed ${esc(e.notified_to || "")}${
+             e.notify_error ? " — fallback, primary address failed" : ""}</div>`
+        : `<div class="bugmeta" style="color:var(--warn)">not emailed${
+             e.notify_error ? ": " + esc(String(e.notify_error).slice(0,120)) : ""}</div>`;
+    return `<div class="item" data-asc="${e.id}">
+      <span class="sev ${kind === "crash" ? "crash" : kind === "screenshot" ? "major" : "minor"}">${kind}</span>
+      <div class="txt">
+        <h3>${esc(label)}</h3>
+        <p>${esc(e.instance_type || "")} <code>${esc(e.instance_id || "—")}</code></p>
+        ${mail}
+      </div>
+      <span class="when">${ascWhen(e.occurred_at || e.received_at)}</span>
+      <div class="acts">
+        ${e.is_feedback ? `<button data-open="${e.id}">Open in ASC</button>` : ""}
+        <button data-ack="${e.id}">Mark read</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $("asclist").querySelectorAll("[data-ack]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await write({}, "?ackEvent=" + b.dataset.ack); await load(); }
+    catch (err) { b.disabled = false; alert(err.message); }
+  });
+  $("asclist").querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
+    window.open(TF_FEEDBACK_URL, "_blank", "noopener");
+  });
 }
 
 // ---------------- bugs ----------------
@@ -439,6 +513,7 @@ document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
   $("pane-roadmap").hidden = t.dataset.tab !== "roadmap";
   $("pane-bugs").hidden = t.dataset.tab !== "bugs";
+  $("pane-asc").hidden = t.dataset.tab !== "asc";
 });
 
 $("signout").onclick = (e) => { e.preventDefault(); signOut(); };
