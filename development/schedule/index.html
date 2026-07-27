@@ -164,7 +164,7 @@
     <div><label for="date">Service day</label><select id="date"></select></div>
     <div><label for="groupby">Group by</label><select id="groupby">
       <option value="terminal">Direction</option>
-      <option value="vessel">Vessel</option>
+      <option value="vessel" selected>Vessel</option>
     </select></div>
     <div class="spacer"></div>
     <div id="status" class="sub" style="margin:0"></div>
@@ -188,6 +188,12 @@ const call = (qs) => authedFetch(API + (qs || ""));
 
 const pacTime = (iso) => iso ? new Date(iso).toLocaleTimeString("en-US",
   { timeZone:"America/Los_Angeles", hour:"2-digit", minute:"2-digit", hour12:false }) : "—";
+// Today in ferry time, as YYYY-MM-DD to match date_only. Computed in Pacific
+// rather than from the browser clock so it stays right from any timezone; "en-CA"
+// is the locale that formats as YYYY-MM-DD.
+const pacificToday = () => new Intl.DateTimeFormat("en-CA",
+  { timeZone:"America/Los_Angeles", year:"numeric", month:"2-digit", day:"2-digit" })
+  .format(new Date());
 
 function delayClass(m){ if (m == null) return ""; if (m <= 5) return "ok";
   return m <= 20 ? "warn" : "bad"; }
@@ -505,7 +511,13 @@ async function boot(){
     const meta = await call("");
     $("route").innerHTML = meta.routes.map(r =>
       `<option value="${r.routeId}">${r.label}</option>`).join("");
-    $("date").innerHTML = meta.days.map(d => `<option value="${d}">${d}</option>`).join("");
+    const days = meta.days || [];
+    $("date").innerHTML = days.map(d => `<option value="${d}">${d}</option>`).join("");
+    // Days come back newest-first, but the newest is usually a stub of a handful of
+    // post-midnight sailings filed under TOMORROW's calendar date — the WSF
+    // service-day mismatch. Selecting it opens the inspector on a near-empty board,
+    // so default to today and fall back to newest only if today has nothing yet.
+    $("date").value = days.includes(pacificToday()) ? pacificToday() : (days[0] ?? "");
     $("route").onchange = load; $("date").onchange = load;
     // Grouping is a view of data already in hand — re-render, do not refetch.
     $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
