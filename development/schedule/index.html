@@ -136,6 +136,23 @@
   .berth-lab{position:absolute;top:50%;left:6px;transform:translateY(-50%);
     font-size:10.5px;color:var(--muted);background:var(--parchment);padding:0 3px;
     white-space:nowrap}
+  /* An explained hole in the boat's day, drawn as the span it occupies. Colour
+     separates "this is what the boat was doing" from "this is a hole in OUR data" —
+     the second is our problem, not an operational fact, and must not read as one. */
+  .gap{position:absolute;left:10px;right:6px;border-radius:6px;padding:5px 8px;
+    border:1px dashed var(--hairline);background:var(--card);pointer-events:none;
+    display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden}
+  .gap-lab{font-size:11px;font-weight:600;line-height:1.25}
+  .gap-sub{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .gap.service{border-color:var(--brass);background:color-mix(in srgb,var(--brass) 9%,transparent)}
+  .gap.service .gap-lab{color:var(--brass)}
+  .gap.maintenance{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+  .gap.maintenance .gap-lab{color:var(--warn)}
+  .gap.unrecorded-sailings{border-style:solid;border-color:var(--bad);
+    background:color-mix(in srgb,var(--bad) 9%,transparent)}
+  .gap.unrecorded-sailings .gap-lab{color:var(--bad)}
+  .gap.no-telemetry .gap-lab,.gap.extended-layover .gap-lab,
+  .gap.repositioning .gap-lab,.gap.unexplained .gap-lab{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -361,6 +378,9 @@ function groupsFor(payload, mode){
   }
   return [...by.values()]
     .map(g => ({
+      // `id` is carried through, not just folded into the label: the gap blocks are
+      // keyed on vessel id and have to find their own track.
+      id: g.id,
       label: (g.name || `Vessel ${g.id ?? "?"}`) + (g.id != null ? ` · ${g.id}` : ""),
       sailings: g.sailings.sort((a,b) => new Date(a.sched) - new Date(b.sched)),
       showDir: true
@@ -380,6 +400,32 @@ function turnMarkup(prev, s, y, chipTop){
   const top = y(prev.arrived), h = Math.max(2, chipTop - top);
   return `<div class="berth" style="top:${top - chipTop}px;height:${h}px">
             <span class="berth-lab">${mins}m</span></div>`;
+}
+
+// Labels come from known_berths, which is owner-editable, so escape rather than trust.
+const esc = (t) => String(t ?? "").replace(/[<>&]/g,
+  (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+
+// An explained hole in the boat's day, drawn as the span it occupies on the axis —
+// the same treatment as the berth line, because it IS the berth line's big sibling:
+// turnMarkup gives up above 240 minutes, which is exactly where these live.
+//
+// Only in vessel mode. Grouped by direction, consecutive chips are not consecutive legs
+// of one boat, so a span drawn between them would be meaningless.
+function gapMarkup(gaps, group, y, mode){
+  if (mode !== "vessel" || !gaps.length || group.id == null) return "";
+  return gaps.filter(g => String(g.vesselId) === String(group.id)).map(g => {
+    const top = y(g.from), h = Math.max(22, y(g.to) - top);
+    // Say what it was, then how long. The count of unrecorded crossings is the whole
+    // point of that class, so it leads there instead of the duration.
+    const sub = g.classification === "unrecorded-sailings"
+      ? `${g.crossings} crossing${g.crossings === 1 ? "" : "s"} missing · ${g.minutes}m`
+      : `${g.minutes}m` + (g.movedMinutes ? ` · ${g.movedMinutes}m under way` : "");
+    return `<div class="gap ${g.classification}" style="top:${top}px;height:${h}px">
+              <div class="gap-lab">${esc(g.label)}</div>
+              <div class="gap-sub">${sub}</div>
+            </div>`;
+  }).join("");
 }
 
 // Where a chip sits on the axis: when the boat ACTUALLY went, falling back to the
@@ -458,7 +504,9 @@ function render(payload){
                           padding-right:${L.of > 1 ? 4 : 0}px">${berth}${slip}${
         sailingHTML(s, g.showDir)}</div>`;
     }).join("");
-    return `<div class="tl-track">${chips}</div>`;
+    // Gaps render BEFORE the chips so a sailing chip is never covered by the block
+    // explaining the silence around it.
+    return `<div class="tl-track">${gapMarkup(payload.gaps || [], g, y, mode)}${chips}</div>`;
   }).join("");
 
   cols.innerHTML = `
