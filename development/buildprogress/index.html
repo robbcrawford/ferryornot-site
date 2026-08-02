@@ -26,6 +26,22 @@
   .item .txt{flex:1;min-width:0}
   .item h3{margin:0;font-size:15px;font-weight:600;line-height:1.4}
   .item p{margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.55}
+  /* The id, so an item can be referred to out loud ("#46") rather than by
+     retyping its title. Tabular figures keep the column edge straight. */
+  .num{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;
+    margin-right:6px;opacity:.75}
+  /* Notes run long — some are several paragraphs of investigation. Clamp to four
+     lines so the board stays scannable, and let any one item open on demand.
+     pre-wrap keeps paragraph breaks, which is what makes four lines a sensible
+     unit instead of one run-on wall. */
+  .item p.detail{white-space:pre-wrap}
+  .item p.detail.clamped{display:-webkit-box;-webkit-line-clamp:4;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .more{margin:3px 0 0;padding:0;background:none;border:0;font-size:12px;
+    color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  .more:hover{color:var(--brass)}
+  .more .chev{display:inline-block;transition:transform .15s}
+  .more[aria-expanded="true"] .chev{transform:rotate(90deg)}
   .area{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
     border:1px solid var(--hairline);border-radius:5px;padding:1px 6px;color:var(--muted);
     white-space:nowrap}
@@ -234,6 +250,27 @@ function filters(){
   });
 }
 
+// Attach a "show more" toggle to every clamped note that is ACTUALLY overflowing.
+// Measured after layout rather than guessed from character count: four rendered
+// lines depends on column width and wrapping, so a length threshold would put a
+// dead toggle on some items and none on others that need it.
+function wireClamps(root){
+  root.querySelectorAll("p.detail").forEach(p => {
+    p.classList.add("clamped");
+    if (p.scrollHeight - p.clientHeight < 2) return;   // fits in four lines
+    const btn = document.createElement("button");
+    btn.className = "more";
+    btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = '<span class="chev">›</span><span class="lbl">Show more</span>';
+    btn.onclick = () => {
+      const open = p.classList.toggle("clamped") === false;
+      btn.setAttribute("aria-expanded", String(open));
+      btn.querySelector(".lbl").textContent = open ? "Show less" : "Show more";
+    };
+    p.insertAdjacentElement("afterend", btn);
+  });
+}
+
 function render(){
   summary(); filters();
   const shown = areaFilter ? items.filter(i => i.area === areaFilter) : items;
@@ -247,8 +284,8 @@ function render(){
         <div class="item ${i.status === "done" ? "done" : ""}" data-id="${i.id}">
           <span class="area">${i.area}</span>
           <div class="txt">
-            <h3>${esc(i.title)}</h3>
-            ${i.detail ? `<p>${esc(i.detail)}</p>` : ""}
+            <h3><span class="num">#${i.id}</span>${esc(i.title)}</h3>
+            ${i.detail ? `<p class="detail">${esc(i.detail)}</p>` : ""}
           </div>
           ${i.completedAt ? `<span class="when">${dateOnly(i.completedAt)}</span>` : ""}
           <div class="acts"><button data-edit="${i.id}">Edit</button></div>
@@ -257,6 +294,7 @@ function render(){
   }).join("");
   $("board").querySelectorAll("[data-edit]").forEach(b =>
     b.onclick = () => openDialog(items.find(x => String(x.id) === b.dataset.edit)));
+  wireClamps($("board"));
 }
 
 let editing = null;
@@ -403,8 +441,8 @@ function renderBugs(){
     return `<div class="item ${RESOLVED.has(b.status) ? "resolved" : ""}" data-bug="${b.id}">
       <span class="sev ${b.severity}">${b.severity}</span>
       <div class="txt">
-        <h3>${esc(b.title)}</h3>
-        ${b.detail ? `<p>${esc(b.detail)}</p>` : ""}
+        <h3><span class="num">#${b.id}</span>${esc(b.title)}</h3>
+        ${b.detail ? `<p class="detail">${esc(b.detail)}</p>` : ""}
         <div class="bugmeta">${label}
           ${b.reporter ? " · " + esc(b.reporter) : ""}
           ${b.appBuild ? " · build " + esc(b.appBuild) : ""}
@@ -418,6 +456,7 @@ function renderBugs(){
   }).join("");
   $("buglist").querySelectorAll("[data-editbug]").forEach(btn =>
     btn.onclick = () => openBug(bugs.find(x => String(x.id) === btn.dataset.editbug)));
+  wireClamps($("buglist"));
   $("buglist").querySelectorAll(".shots img").forEach(img =>
     img.onclick = () => { const lb = $("lightbox");
       lb.querySelector("img").src = img.src; lb.style.display = "flex"; });
