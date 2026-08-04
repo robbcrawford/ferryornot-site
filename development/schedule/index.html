@@ -90,6 +90,8 @@
      split matters most — the reader needs to see how much of a full boat is
      already spoken for before they arrive. */
   .bar.overfull{box-shadow:0 0 0 1.5px var(--bad)}
+  /* The combined figure differs from WSF's published one, so it is marked. */
+  .occ-combined{color:var(--bad);font-variant-numeric:tabular-nums}
   .barkey{display:flex;gap:11px;align-items:center;font-size:11px;color:var(--muted);
     margin-top:5px}
   .barkey b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;
@@ -441,8 +443,39 @@ function sailClass(s){
 // Clamped at the track: a demand that OVERRUNS the deck renders full and turns red rather
 // than drawing past the end of a boat that has a fixed size. The overflow is reported in
 // words by queueNote(), not by geometry.
+// The inline boarding percentage.
+//
+// ★ COMBINED, NOT JUST THIS SAILING'S SCANS. WSF's figure counts only what was scanned
+// against this slot, so on a sailing carrying a queue it understates the boat badly —
+// the 09:40 published 37% against a deck that was already oversubscribed. The number
+// beside the bar has to agree with the bar, or the two contradict each other on the same
+// row.
+//
+// Deliberately NOT clamped at 100: on an internal inspector "105%" says oversubscribed
+// at a glance, which is exactly the state worth seeing. The tooltip carries WSF's own
+// figure so the difference is always inspectable.
+//
+// With no queue this reduces to WSF's number by construction (demand = own scans), so an
+// ordinary sailing reads exactly as it did.
+function boardingPct(s){
+  const cap = s.deckCapacity, dem = s.expectedDemand;
+  if (cap == null || dem == null || !cap) {
+    return s.occupancy != null ? `<span>${s.occupancy}%</span>` : "";
+  }
+  const pct = Math.round(dem / cap * 100);
+  const carried = (s.queueAhead ?? 0) > 0;
+  const title = carried
+    ? `WSF says ${s.occupancy ?? "\u2014"}% \u00b7 with ${s.queueAhead} carried over: ${dem} of ${cap}`
+    : `${dem} of ${cap}`;
+  return `<span title="${title}"${carried ? ' class="occ-combined"' : ""}>${pct}%</span>`;
+}
+
 function boardingBar(s){
-  const cap = s.spacesLeft != null ? (s.expectedDemand + s.spacesLeft) : null;
+  // The capacity the cascade actually used. Deriving it as demand + spacesLeft was
+  // wrong on an OVERFULL sailing, where spacesLeft is clamped at zero: the 09:40
+  // derived 206 instead of 197 and drew its segments at 64.6/35.4 rather than
+  // 67.5/32.5. It still filled the track, which is why it did not look wrong.
+  const cap = s.deckCapacity ?? null;
   const spill = s.queueAhead ?? 0;
   const own = (s.expectedDemand != null && s.queueAhead != null)
     ? s.expectedDemand - s.queueAhead : null;
@@ -734,7 +767,7 @@ function sailingHTML(s, showDir){
         : s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
       ${swapBadge}
       <div class="occ">
-        ${occ != null ? `<span>${occ}%</span>${boardingBar(s)}` : boardingBar(s)}
+        ${boardingPct(s)}${boardingBar(s)}
       </div>
     </div>`;
   return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
@@ -1089,8 +1122,8 @@ function liveRowHTML(s, f){
   if (s.priorSoldOut ?? f?.prior_sold_out) pills.push('<span class="pill risk">prior sold out</span>');
   if (!f) pills.push('<span class="pill dead">not in feed</span>');
 
-  const occ = s.occupancy != null
-    ? `<span class="occ"><span>${s.occupancy}%</span>
+  const occ = (s.occupancy != null || s.expectedDemand != null)
+    ? `<span class="occ">${boardingPct(s)}
          ${boardingBar(s)}</span>` : "";
 
   const why = cancelled && s.cancelPhrase
