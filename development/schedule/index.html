@@ -790,7 +790,7 @@ function liveRowHTML(s, f){
       <span class="ct-sched">${pacTime(s.sched)}</span>
       ${delayChip}
       ${wsf}
-      <span class="rowend">${occ}${pills.join("")}</span>
+      <span class="rowend">${pills.join("")}${occ}</span>
     </div>
     ${why}
     <div class="body">
@@ -877,16 +877,29 @@ function renderLive(live, feed){
   }
   // A NOW LINE, because the column is a whole day rather than a forward window and the
   // eye needs the boundary between "this is what happened" and "this is what we are
-  // claiming". Placed by CLOCK TIME rather than after the last departed sailing: on a
-  // disrupted evening a boat can still be sitting at the berth past its slot, and the
-  // divider must not imply it has gone.
+  // claiming".
+  //
+  // ⚠️ PLACED BY THE TIME THE ROW PRINTS, NOT BY THE SCHEDULED TIME. Rows are ordered
+  // by slot but headlined with actual-then-estimate-then-slot, so on a late evening the
+  // two disagree: the 21:00 sailing carrying +24m prints 21:24, and testing its slot put
+  // it ABOVE a 21:08 divider — a boat that has not left yet, filed under what already
+  // happened, showing a time later than the line above it. Whatever number the row shows
+  // is the number the divider has to be compared against, or the column reads as
+  // out of order.
   const now = Date.now();
+  // Mirror of liveRowHTML's `shown`: keep these two in step or the divider drifts again.
+  const headlineTime = (s, f) => {
+    const actual = f?.actual_depart ?? s.actual;
+    if (actual) return new Date(actual).getTime();
+    if (f?.usable && f?.predicted_depart) return new Date(f.predicted_depart).getTime();
+    return new Date(s.sched).getTime();
+  };
   const withDivider = (rows) => {
     let placed = false;
     return rows.map(s => {
       const f = byKey.get(keyOf(s.direction, s.sched));
       let lead = "";
-      if (!placed && new Date(s.sched).getTime() > now) {
+      if (!placed && headlineTime(s, f) > now) {
         placed = true;
         lead = `<div class="nowline"><span>now · ${pacTime(new Date().toISOString())}</span></div>`;
       }
