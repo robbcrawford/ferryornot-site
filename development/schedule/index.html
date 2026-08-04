@@ -59,6 +59,11 @@
   .sail.verylate{border-left:3px solid var(--bad)}
   .sail.ontime{border-left:3px solid var(--ok)}
   .sail.pending{border-left:3px dashed var(--muted)}
+  /* Matches .lrow.cancelled in the live view — the two views showed the same sailing
+     differently until 2026-08-04, and the styling is part of not doing that again. */
+  .sail.cancelled{border-left:3px solid var(--bad);
+    background:color-mix(in srgb, var(--bad) 7%, var(--card))}
+  .sail.cancelled .ct{text-decoration:line-through;color:var(--bad)}
   .sailhead{display:flex;align-items:center;gap:12px;padding:10px 13px;cursor:pointer;
     user-select:none}
   .sailhead:hover{background:color-mix(in srgb,var(--brass) 7%,transparent)}
@@ -264,6 +269,13 @@
       <option value="terminal">Direction</option>
       <option value="vessel" selected>Vessel</option>
     </select></div>
+    <!-- Its own control rather than sharing #groupby with the timeline: the two views
+         have different defaults (a timeline reads best per vessel, a live column per
+         direction) and switching view should not silently re-group the other one. -->
+    <div data-when="live"><label for="livegroupby">Group by</label><select id="livegroupby">
+      <option value="direction" selected>Direction</option>
+      <option value="vessel">Vessel</option>
+    </select></div>
     <div class="spacer"></div>
     <div id="status" class="sub" style="margin:0"></div>
   </div>
@@ -312,10 +324,29 @@ function delayClass(m){ if (m == null) return ""; if (m <= 5) return "ok";
   return m <= 20 ? "warn" : "bad"; }
 
 function sailClass(s){
+  // CANCELLED FIRST. 2026-08-04: timeadjbyroute withdrew the 08:45 Bainbridge→Seattle
+  // and this timeline drew it as an ordinary pending chip labelled "overdue" — telling
+  // a reader to keep waiting for a boat WSF had cancelled. Overdue and cancelled are
+  // opposite news, and this test has to come first because a cancelled sailing is ALSO
+  // pending (no actual) and its `basis` still carries the OVERDUE marker.
+  if (isCancelled(s)) return "cancelled";
   if (!s.actual) return "pending";
   if (s.delay == null) return "";
   return s.delay <= 5 ? "ontime" : (s.delay <= 20 ? "late" : "verylate");
 }
+
+// ONE definition, used by the timeline, the live rows and both summaries.
+//
+// `cancelled` is now the ANSWER, computed once in the backend's
+// sailing_cancellation_state and served by BOTH schedule_day and schedule_live. It used
+// to be prose-only in the live payload and absent entirely from the service-day payload,
+// so each consumer combined the ingredients itself — three sites did, and the timeline
+// was the one that never got the rule.
+//
+// The `status` half is kept as a belt-and-braces fallback in the same spirit as the
+// app's wire-format rule: if the field ever goes missing server-side, absent must not
+// read as "running".
+function isCancelled(s){ return !!s.cancelled || s.status === "CANCELED"; }
 
 // Boarding curve. x = minutes until scheduled departure, counting DOWN to 0, which is
 // the axis the cliff actually happens on. Sales anchors marked because "when did this
@@ -397,16 +428,28 @@ function sailingHTML(s, showDir){
   // header collapses to one line: the time that matters, the scheduled time it is
   // measured against, and the delay. Anything taller and chips collide at real ferry
   // headways — measured before this change, 9 of 20 consecutive pairs overlapped.
-  const overdue = (s.basis || "").includes("OVERDUE");
-  const lead = s.actual ? pacTime(s.actual)
+  const cancelled = isCancelled(s);
+  // A cancelled sailing is still `pending` and still carries an OVERDUE basis, so this
+  // has to be guarded rather than tested independently.
+  const overdue = !cancelled && (s.basis || "").includes("OVERDUE");
+  const lead = cancelled ? pacTime(s.predicted || s.sched)
+             : s.actual ? pacTime(s.actual)
              : overdue ? "overdue"
              : s.predicted ? pacTime(s.predicted) : "—";
+  // The delay chip is suppressed on a cancelled row: a delay measured against a
+  // withdrawn schedule is invented, which is the same reason persistence refuses to
+  // anchor on one.
   const head = `<div class="sailhead" title="${s.id}">
       <span class="caret">▸</span>
       ${showDir ? `<span class="dir">${s.dirLabel}</span>` : ""}
-      <span class="ct ${s.actual ? "act" : "pred"}">${lead}</span>
+      <span class="ct ${cancelled ? "" : s.actual ? "act" : "pred"}">${lead}</span>
       <span class="ct-sched">${pacTime(s.sched)}</span>
-      ${s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
+      ${cancelled
+        ? `<span class="pill dead" title="${s.cancelSource === "bulletin"
+              ? "From WSF bulletin prose — annotation, not the structured signal"
+              : "From timeadjbyroute — the structured signal"}">cancelled${
+              s.cancelSource === "bulletin" ? " (bulletin)" : ""}</span>`
+        : s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
       ${swapBadge}
       <div class="occ">
         ${occ != null ? `<span>${occ}%</span><span class="bar"><i style="width:${Math.min(100,occ)}%"></i></span>` : ""}
@@ -695,13 +738,12 @@ function liveRowHTML(s, f){
   const gone = !!(f?.actual_depart ?? s.actual);
   const delay = f?.delay_minutes ?? null;
   const basis = f?.basis ?? (f ? "schedule" : null);
-  // CANCELLED — THE STRUCTURED SIGNAL FIRST, the prose parse only as a fallback.
-  // `status` is written from WSF's own timeadjbyroute (and the space feed's
-  // IsCancelled); `s.cancelled` is our parse of bulletin PROSE, which is annotation,
-  // not detection — on the 2026-08-03 Chimacum outage it found 1 of 11 and bound it
-  // to the wrong terminal. Reading only `s.cancelled` is why this page rendered an
-  // eleven-sailing outage as ordinary timetable rows.
-  const cancelled = s.status === "CANCELED" || !!s.cancelled;
+  // CANCELLED — one shared definition, see isCancelled(). This branch used to combine
+  // the two signals itself, which worked; the service-day timeline did not, which did
+  // not. `s.cancelled` is now the backend's own combined verdict and `s.cancelSource`
+  // says which signal produced it, so the distinction between the structured feed and
+  // the prose parse survives without every consumer having to re-establish it.
+  const cancelled = isCancelled(s);
   const cls = cancelled ? "cancelled"
             : (gone ? "gone " : "") + (delay == null ? ""
                : delay <= 5 ? "ontime" : delay <= 20 ? "late" : "verylate");
@@ -783,9 +825,14 @@ function liveRowHTML(s, f){
        : (s.waitHours === 0 ? "no extended wait" : s.waitHours + "h")],
   ].map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join("");
 
+  // Grouped by vessel, the column no longer states the direction, so the row has to —
+  // otherwise a boat's day reads as an undifferentiated list of times.
+  const dirTag = (window.__liveGroupBy === "vessel" && s.dirLabel)
+    ? `<span class="dir">${esc(s.dirLabel)}</span>` : "";
   return `<div class="lrow ${cls}" data-id="${esc(s.id)}">
     <div class="lhead" title="${esc(s.id)}">
       <span class="caret">▸</span>
+      ${dirTag}
       <span class="lt ${gone ? "act" : (f?.usable ? "pred" : "")}">${shown}</span>
       <span class="ct-sched">${pacTime(s.sched)}</span>
       ${delayChip}
@@ -820,8 +867,7 @@ function renderLive(live, feed){
   const feedMissing = sailings.filter(s => !byKey.has(keyOf(s.direction, s.sched)));
   const rows = sailings.map(s => byKey.get(keyOf(s.direction, s.sched))).filter(Boolean);
   const observed = rows.filter(r => r.basis === "observed");
-  // Same rule as the rows: structured status first, bulletin prose as fallback.
-  const isCancelled = s => s.status === "CANCELED" || !!s.cancelled;
+  // Was a third local copy of the cancellation rule; now the shared isCancelled().
   const upcoming = sailings.filter(s => !s.actual && !isCancelled(s));
   const carried = rows.filter(r => r.basis === "persistence");
   const bare = rows.filter(r => r.basis === "schedule" && !r.departed);
@@ -869,11 +915,29 @@ function renderLive(live, feed){
        <div class="buls">${notices.map(bulletinHTML).join("")}</div></details>`
     : "";
 
-  // ---- one column per direction, in time order
+  // ---- one column per group, in time order
+  //
+  // Direction is the default because it is how a rider thinks. Vessel is the view that
+  // makes a disruption legible: a boat going out of service takes a whole COLUMN with
+  // it, where by direction the same event is scattered down two columns interleaved
+  // with the boat that is still running. 2026-08-04 is the case — the Chimacum's
+  // cancellations read as five isolated rows by direction and as one dead column by
+  // vessel.
+  const groupBy = $("livegroupby")?.value ?? "direction";
+  window.__liveGroupBy = groupBy;   // read by liveRowHTML for the per-row direction tag
   const dirs = new Map();
   for (const s of sailings){
-    if (!dirs.has(s.direction)) dirs.set(s.direction, { label: s.dirLabel, rows: [] });
-    dirs.get(s.direction).rows.push(s);
+    // vessel_name is rewritten from the CURRENT assignment, so group on the id where we
+    // have one and fall back to the planned id — the same reason schedule_live resolves
+    // the name from the vessels table rather than trusting the sailing row.
+    const key = groupBy === "vessel"
+      ? String(s.vesselId ?? s.plannedVesselId ?? "unassigned")
+      : s.direction;
+    const label = groupBy === "vessel"
+      ? (s.vessel || s.plannedVessel || "Unassigned")
+      : s.dirLabel;
+    if (!dirs.has(key)) dirs.set(key, { label, rows: [] });
+    dirs.get(key).rows.push(s);
   }
   // A NOW LINE, because the column is a whole day rather than a forward window and the
   // eye needs the boundary between "this is what happened" and "this is what we are
@@ -907,8 +971,10 @@ function renderLive(live, feed){
     }).join("");
   };
 
+  // Sort on the LABEL, not the key: grouped by vessel the key is a numeric id, so
+  // sorting by it ordered the columns by WSF's internal vessel number.
   $("livecols").innerHTML = dirs.size
-    ? [...dirs.entries()].sort((a,b) => a[0].localeCompare(b[0])).map(([code, d]) => `
+    ? [...dirs.entries()].sort((a,b) => a[1].label.localeCompare(b[1].label)).map(([code, d]) => `
         <div class="lcol">
           <div class="coltitle">${esc(d.label)}
             <span class="muted">(${d.rows.length})</span></div>
@@ -1029,6 +1095,9 @@ async function boot(){
     $("date").onchange = load;
     // Grouping is a view of data already in hand — re-render, do not refetch.
     $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
+    $("livegroupby").onchange = () => {
+      if (window.__live) renderLive(window.__live, window.__feed);
+    };
     $("view").onchange = applyView;
 
     $("view").value = location.hash === "#day" ? "day" : "live";
