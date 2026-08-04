@@ -695,7 +695,14 @@ function liveRowHTML(s, f){
   const gone = !!(f?.actual_depart ?? s.actual);
   const delay = f?.delay_minutes ?? null;
   const basis = f?.basis ?? (f ? "schedule" : null);
-  const cls = s.cancelled ? "cancelled"
+  // CANCELLED — THE STRUCTURED SIGNAL FIRST, the prose parse only as a fallback.
+  // `status` is written from WSF's own timeadjbyroute (and the space feed's
+  // IsCancelled); `s.cancelled` is our parse of bulletin PROSE, which is annotation,
+  // not detection — on the 2026-08-03 Chimacum outage it found 1 of 11 and bound it
+  // to the wrong terminal. Reading only `s.cancelled` is why this page rendered an
+  // eleven-sailing outage as ordinary timetable rows.
+  const cancelled = s.status === "CANCELED" || !!s.cancelled;
+  const cls = cancelled ? "cancelled"
             : (gone ? "gone " : "") + (delay == null ? ""
                : delay <= 5 ? "ontime" : delay <= 20 ? "late" : "verylate");
 
@@ -706,7 +713,7 @@ function liveRowHTML(s, f){
   // we no longer drive anything from — and it disagrees with the record: sailings an
   // hour past their slot with nothing observed were coming back false and rendering as
   // an ordinary timetable row. 20 minutes of grace so a merely-late boat is not libelled.
-  const overdue = !gone && !s.cancelled &&
+  const overdue = !gone && !cancelled &&
                   Date.now() - new Date(s.sched).getTime() > 20 * 60000;
   const shown = gone ? pacTime(f?.actual_depart ?? s.actual)
               : overdue ? "no departure seen"
@@ -718,7 +725,7 @@ function liveRowHTML(s, f){
   // sailing is at least as late as the clock says and still growing. Printing the plain
   // estimate there states a number we have already been proven wrong about.
   const overdueBy = Math.round((Date.now() - new Date(s.sched).getTime()) / 60000);
-  const delayChip = s.cancelled ? ""
+  const delayChip = cancelled ? ""
     : overdue
       ? `<span class="delay ${delayClass(overdueBy)}" title="Nothing observed yet — at
            least this late, and growing">≥&nbsp;${sign(Math.max(overdueBy, delay ?? 0))}</span>`
@@ -736,9 +743,9 @@ function liveRowHTML(s, f){
     : "";
 
   const pills = [];
-  if (s.cancelled) pills.push('<span class="pill dead">cancelled</span>');
+  if (cancelled) pills.push('<span class="pill dead">cancelled</span>');
   else if (overdue) pills.push('<span class="pill dead">overdue</span>');
-  if (!gone && !s.cancelled && !overdue) {
+  if (!gone && !cancelled && !overdue) {
     pills.push(basis === "persistence"
       ? `<span class="pill served" title="${f.anchor_vessel ? esc(f.anchor_vessel) + " last went " +
            sign(f.carried_delay_minutes) + ", " + f.anchor_age_minutes + " min ago" : ""}">persistence ${
@@ -752,7 +759,7 @@ function liveRowHTML(s, f){
     ? `<span class="occ"><span>${s.occupancy}%</span>
          <span class="bar"><i style="width:${Math.min(100, s.occupancy)}%"></i></span></span>` : "";
 
-  const why = s.cancelled && s.cancelPhrase
+  const why = cancelled && s.cancelPhrase
     ? `<div class="lsub"><span class="why">WSF: “${esc(s.cancelPhrase)}”</span></div>` : "";
 
   const kv = [
@@ -813,10 +820,12 @@ function renderLive(live, feed){
   const feedMissing = sailings.filter(s => !byKey.has(keyOf(s.direction, s.sched)));
   const rows = sailings.map(s => byKey.get(keyOf(s.direction, s.sched))).filter(Boolean);
   const observed = rows.filter(r => r.basis === "observed");
-  const upcoming = sailings.filter(s => !s.actual && !s.cancelled);
+  // Same rule as the rows: structured status first, bulletin prose as fallback.
+  const isCancelled = s => s.status === "CANCELED" || !!s.cancelled;
+  const upcoming = sailings.filter(s => !s.actual && !isCancelled(s));
   const carried = rows.filter(r => r.basis === "persistence");
   const bare = rows.filter(r => r.basis === "schedule" && !r.departed);
-  const cancelled = sailings.filter(s => s.cancelled);
+  const cancelled = sailings.filter(isCancelled);
   const feedBroken = !feed;
   const parts = [];
   if (feedBroken) {
@@ -837,7 +846,7 @@ function renderLive(live, feed){
         feed.anchorMaxAgeMinutes ?? 120} minutes, past which a carried delay stops beating
       the schedule)</span>.`);
   }
-  if (cancelled.length) parts.push(`<b>${cancelled.length}</b> cancelled by bulletin.`);
+  if (cancelled.length) parts.push(`<b>${cancelled.length}</b> cancelled.`);
   $("verdict").className = "verdict" + (feedBroken || feedMissing.length ? " bad" : "");
   $("verdict").innerHTML = parts.join(" ");
 
