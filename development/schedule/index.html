@@ -96,6 +96,48 @@
     font-size:11px;letter-spacing:.05em;text-transform:uppercase}
   table.trail td{padding:3px 8px 3px 0;border-top:1px solid var(--hairline)}
   .muted{color:var(--muted)}
+  /* ---- service-day calendar ---- */
+  .calwrap{position:relative}
+  .datebtn{font:inherit;font-variant-numeric:tabular-nums;background:var(--card);
+    color:inherit;border:1px solid var(--hairline);border-radius:7px;padding:5px 10px;
+    cursor:pointer}
+  .datebtn:hover{border-color:var(--brass)}
+  .calpop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:266px;
+    background:var(--card);border:1px solid var(--hairline);border-radius:11px;
+    box-shadow:0 14px 40px rgba(0,0,0,.42);padding:11px}
+  .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .calhead b{font-size:13.5px;letter-spacing:.02em}
+  .calnav{background:none;border:1px solid var(--hairline);border-radius:6px;color:inherit;
+    cursor:pointer;width:26px;height:24px;line-height:1}
+  .calnav:disabled{opacity:.3;cursor:default}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .caldow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    text-align:center;padding-bottom:3px}
+  .calday{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+    font-size:12.5px;font-variant-numeric:tabular-nums;border-radius:6px;border:1px solid transparent;
+    background:none;color:inherit;cursor:pointer;position:relative}
+  .calday:hover:not(:disabled){border-color:var(--brass)}
+  .calday.sel{background:var(--brass);color:#12161f;font-weight:700}
+  /* Today is CIRCLED rather than filled, so it stays legible when it is also the
+     selected day — the two states have to be distinguishable at a glance. */
+  .calday.today{outline:1.5px solid var(--brass);outline-offset:-2px;border-radius:50%}
+  /* A published timetable with nothing observed behind it. Marked with a dot rather
+     than a colour so it does not compete with the selected/today states. */
+  .calday.timetable::after{content:"";position:absolute;bottom:3px;width:3px;height:3px;
+    border-radius:50%;background:var(--muted)}
+  /* ★ THE TWO KINDS OF EMPTY, styled differently on purpose. Before we were collecting
+     the day HAPPENED and we missed it; past the published horizon there is no timetable
+     to miss. Same disabled state would tell a reader the same thing about a hole in our
+     record and a hole in the world. */
+  .calday.notcollected{color:var(--muted);opacity:.42;cursor:not-allowed;
+    text-decoration:line-through}
+  .calday.notpublished{color:var(--muted);opacity:.42;cursor:not-allowed}
+  .callegend{margin-top:9px;padding-top:8px;border-top:1px solid var(--hairline);
+    font-size:11px;color:var(--muted);line-height:1.55}
+  .callegend i{font-style:normal}
+  /* Banner on a day we can only show the plan for. */
+  .ttbanner{border:1px solid var(--brass);border-radius:9px;padding:9px 12px;margin:0 0 12px;
+    font-size:13px;background:color-mix(in srgb,var(--brass) 8%,transparent)}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
   /* The spill line reads as a finding, not a caveat — it is the one number on a
      cancelled row that changes what the NEXT sailing looks like. */
@@ -268,7 +310,14 @@
       <option value="day">Service day</option>
     </select></div>
     <div><label for="route">Route</label><select id="route"></select></div>
-    <div data-when="day"><label for="date">Service day</label><select id="date"></select></div>
+    <!-- The value still lives in a hidden #date input so load() and everything reading
+         $("date").value is untouched; only the way a human picks it changed. -->
+    <div data-when="day" class="calwrap">
+      <label for="datebtn">Service day</label>
+      <button type="button" id="datebtn" class="datebtn" aria-haspopup="dialog"></button>
+      <input type="hidden" id="date">
+      <div id="calpop" class="calpop" hidden role="dialog" aria-label="Pick a service day"></div>
+    </div>
     <div data-when="day"><label for="groupby">Group by</label><select id="groupby">
       <option value="terminal">Direction</option>
       <option value="vessel" selected>Vessel</option>
@@ -351,6 +400,107 @@ function sailClass(s){
 // app's wire-format rule: if the field ever goes missing server-side, absent must not
 // read as "running".
 function isCancelled(s){ return !!s.cancelled || s.status === "CANCELED"; }
+
+// ---- service-day calendar ---------------------------------------------------
+//
+// Replaces a 23-entry <select> that could only offer days we had already observed. The
+// season capture put 47 days of published timetable ahead of today, and a dropdown of
+// past dates cannot express the difference between "we watched this" and "this is the
+// plan" — let alone between the two reasons a day might be unavailable.
+//
+// ★ THE TWO KINDS OF EMPTY ARE STYLED DIFFERENTLY, DELIBERATELY:
+//     before collectedFrom  the day happened and we missed it   → struck through
+//     after  publishedTo    WSF has not published that far      → plain dim
+//   Rendering both as one disabled state would say the same thing about a hole in our
+//   record and a hole in the world.
+const CAL = { kinds: new Map(), from: null, to: null, today: null, view: null };
+
+function calSetup(calendar){
+  CAL.kinds.clear();
+  for (const d of (calendar?.days ?? [])) CAL.kinds.set(d.day, d);
+  CAL.from  = calendar?.collectedFrom ?? null;
+  CAL.to    = calendar?.publishedTo ?? null;
+  CAL.today = calendar?.today ?? pacificToday();
+}
+
+/// What a given ISO day is, for styling and selectability.
+function calState(iso){
+  const known = CAL.kinds.get(iso);
+  if (known) return known.kind;                       // observed | today | timetable
+  if (CAL.from && iso < CAL.from) return "notcollected";
+  if (CAL.to && iso > CAL.to) return "notpublished";
+  // Inside the range but absent from the map: a gap in collection rather than an edge.
+  return "notcollected";
+}
+const calSelectable = (iso) => !["notcollected", "notpublished"].includes(calState(iso));
+
+function calRender(){
+  const pop = $("calpop");
+  const [vy, vm] = CAL.view;
+  const first = new Date(Date.UTC(vy, vm, 1));
+  const monthName = first.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  const startDow = first.getUTCDay();
+  const daysIn = new Date(Date.UTC(vy, vm + 1, 0)).getUTCDate();
+  const iso = (d) => `${vy}-${String(vm + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  // Only offer months that can contain something. Beyond the edges every cell would be
+  // disabled, which is a month worth not paging into.
+  const prevOk = !CAL.from || `${vy}-${String(vm + 1).padStart(2,"0")}-01` > CAL.from;
+  const nextOk = !CAL.to || iso(daysIn) < CAL.to;
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push('<div></div>');
+  for (let d = 1; d <= daysIn; d++){
+    const day = iso(d);
+    const st = calState(day);
+    const sel = day === $("date").value;
+    const cls = ["calday", st === "today" ? "" : st,
+                 day === CAL.today ? "today" : "", sel ? "sel" : ""].filter(Boolean).join(" ");
+    const n = CAL.kinds.get(day)?.sailings;
+    const title = st === "notcollected" ? "We weren't collecting on this day"
+                : st === "notpublished" ? "WSF hasn't published a timetable this far ahead"
+                : st === "timetable"    ? `Published timetable only — ${n} sailings, nothing observed yet`
+                : `${n} sailings recorded`;
+    cells.push(`<button type="button" class="${cls}" data-day="${day}" title="${title}"${
+      calSelectable(day) ? "" : " disabled"}>${d}</button>`);
+  }
+
+  pop.innerHTML = `
+    <div class="calhead">
+      <button type="button" class="calnav" data-nav="-1"${prevOk ? "" : " disabled"}>‹</button>
+      <b>${monthName}</b>
+      <button type="button" class="calnav" data-nav="1"${nextOk ? "" : " disabled"}>›</button>
+    </div>
+    <div class="calgrid">
+      ${["S","M","T","W","T","F","S"].map(d => `<div class="caldow">${d}</div>`).join("")}
+      ${cells.join("")}
+    </div>
+    <div class="callegend">
+      <i>◦</i> published timetable, nothing observed yet<br>
+      <i style="text-decoration:line-through">00</i> before we started collecting (${CAL.from ?? "—"})<br>
+      <i style="opacity:.5">00</i> past WSF's published horizon (${CAL.to ?? "—"})
+    </div>`;
+
+  pop.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => {
+    const m = vm + Number(b.dataset.nav);
+    CAL.view = [vy + Math.floor(m / 12), ((m % 12) + 12) % 12];
+    calRender();
+  });
+  pop.querySelectorAll("[data-day]").forEach(b => b.onclick = () => {
+    $("date").value = b.dataset.day;
+    $("datebtn").textContent = b.dataset.day;
+    calClose();
+    load();
+  });
+}
+
+function calOpen(){
+  const cur = $("date").value || CAL.today;
+  CAL.view = [Number(cur.slice(0, 4)), Number(cur.slice(5, 7)) - 1];
+  $("calpop").hidden = false;
+  calRender();
+}
+function calClose(){ $("calpop").hidden = true; }
 
 // How many vehicles a cancellation pushed onto the next sailing.
 //
@@ -696,6 +846,16 @@ function render(payload){
     </div>`;
 
   const bar = [];
+  // ★ SAY WHAT THIS PAGE IS when it is showing a plan rather than a record. Every other
+  // number on this view is a comparison against an actual departure, and a future day has
+  // none — so without this the columns read as a day on which nothing happened, which is
+  // the opposite of what they mean.
+  if (payload.source === "timetable"){
+    bar.push(`<div class="ttbanner" style="flex-basis:100%"><b>Timetable only.</b>
+      This is WSF's published schedule for ${payload.day}, captured ahead of the day.
+      Nothing has been observed yet — no actual departures, no boarding curves, no
+      cancellations, and no delay to compare against.</div>`);
+  }
   for (const w of payload.waits || []){
     bar.push(`<span class="chip wait">${w.direction} — ${
       w.hours === 0 ? "wait cleared" : w.hours + "h wait"} @ ${pacTime(w.from)}</span>`);
@@ -1116,12 +1276,13 @@ async function boot(){
     $("route").value = meta.routes[0]?.routeId ?? "all";
     window.__lastDayRoute = $("route").value;
     const days = meta.days || [];
-    $("date").innerHTML = days.map(d => `<option value="${d}">${d}</option>`).join("");
-    // Days come back newest-first, but the newest is usually a stub of a handful of
-    // post-midnight sailings filed under TOMORROW's calendar date — the WSF
-    // service-day mismatch. Selecting it opens the inspector on a near-empty board,
-    // so default to today and fall back to newest only if today has nothing yet.
+    calSetup(meta.calendar);
+    // Default to today. The old comment here explained that the newest day was usually a
+    // stub of post-midnight sailings filed under TOMORROW's calendar date — that was the
+    // service-day mismatch, fixed in 20260804380000, so "newest" is now a real day and
+    // the fallback is no longer papering over anything.
     $("date").value = days.includes(pacificToday()) ? pacificToday() : (days[0] ?? "");
+    $("datebtn").textContent = $("date").value || "—";
 
     $("route").onchange = () => {
       if ($("view").value === "live"){
@@ -1133,7 +1294,16 @@ async function boot(){
         $("route").value = window.__lastDayRoute; load();
       } else { window.__lastDayRoute = $("route").value; load(); }
     };
-    $("date").onchange = load;
+    $("datebtn").onclick = (e) => {
+      e.stopPropagation();
+      $("calpop").hidden ? calOpen() : calClose();
+    };
+    // Click-away and Escape, because a popover that only closes by re-clicking its own
+    // button is a trap on a page whose content sits behind it.
+    document.addEventListener("click", (e) => {
+      if (!$("calpop").hidden && !$("calpop").contains(e.target)) calClose();
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") calClose(); });
     // Grouping is a view of data already in hand — re-render, do not refetch.
     $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
     $("livegroupby").onchange = () => {
