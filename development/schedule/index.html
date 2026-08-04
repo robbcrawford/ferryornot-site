@@ -96,24 +96,34 @@
     font-size:11px;letter-spacing:.05em;text-transform:uppercase}
   table.trail td{padding:3px 8px 3px 0;border-top:1px solid var(--hairline)}
   .muted{color:var(--muted)}
-  /* ---- service-day calendar ---- */
+  /* ---- service-day calendar ----
+     ⚠️ EVERY BUTTON HERE RESETS padding AND margin. dev.css styles the bare `button`
+     element globally with `padding:9px 16px; margin-top:14px` for the sign-in form, and
+     a calendar cell that inherits 32px of horizontal padding blows the 7-column grid
+     clean out of its popover — which is exactly what shipped. Setting only colour and
+     border on a <button> is not enough on this stylesheet. */
   .calwrap{position:relative}
   .datebtn{font:inherit;font-variant-numeric:tabular-nums;background:var(--card);
-    color:inherit;border:1px solid var(--hairline);border-radius:7px;padding:5px 10px;
-    cursor:pointer}
+    color:inherit;border:1px solid var(--hairline);border-radius:7px;
+    padding:8px 11px;margin:0;font-size:15px;cursor:pointer;min-width:126px;text-align:left}
   .datebtn:hover{border-color:var(--brass)}
-  .calpop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:266px;
+  .calpop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:302px;
     background:var(--card);border:1px solid var(--hairline);border-radius:11px;
     box-shadow:0 14px 40px rgba(0,0,0,.42);padding:11px}
   .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .calhead b{font-size:13.5px;letter-spacing:.02em}
   .calnav{background:none;border:1px solid var(--hairline);border-radius:6px;color:inherit;
-    cursor:pointer;width:26px;height:24px;line-height:1}
+    cursor:pointer;width:26px;height:26px;padding:0;margin:0;font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center}
   .calnav:disabled{opacity:.3;cursor:default}
   .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
   .caldow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
     text-align:center;padding-bottom:3px}
-  .calday{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  /* Fixed height rather than aspect-ratio: the column is already 1fr, and letting the
+     height derive from a width that derives from content is how a stray padding turned
+     34px cells into 100px ones. min-width:0 keeps a grid item from refusing to shrink. */
+  .calday{height:37px;min-width:0;padding:0;margin:0;
+    display:flex;align-items:center;justify-content:center;
     font-size:12.5px;font-variant-numeric:tabular-nums;border-radius:6px;border:1px solid transparent;
     background:none;color:inherit;cursor:pointer;position:relative}
   .calday:hover:not(:disabled){border-color:var(--brass)}
@@ -121,6 +131,10 @@
   /* Today is CIRCLED rather than filled, so it stays legible when it is also the
      selected day — the two states have to be distinguishable at a glance. */
   .calday.today{outline:1.5px solid var(--brass);outline-offset:-2px;border-radius:50%}
+  /* ...and when it IS both, a brass ring on a brass fill is invisible. Flip the ring to
+     the card colour so "today" and "selected" stay separately readable, which is the
+     whole reason today is a ring and not a fill. */
+  .calday.today.sel{outline-color:var(--card)}
   /* A published timetable with nothing observed behind it. Marked with a dot rather
      than a colour so it does not compete with the selected/today states. */
   .calday.timetable::after{content:"";position:absolute;bottom:3px;width:3px;height:3px;
@@ -133,8 +147,12 @@
     text-decoration:line-through}
   .calday.notpublished{color:var(--muted);opacity:.42;cursor:not-allowed}
   .callegend{margin-top:9px;padding-top:8px;border-top:1px solid var(--hairline);
-    font-size:11px;color:var(--muted);line-height:1.55}
+    font-size:11px;color:var(--muted);line-height:1.5}
   .callegend i{font-style:normal}
+  /* nowrap on the whole row: the dates were breaking mid-token ("2026-09-\n19"), which
+     reads as a typo rather than a wrap. The popover is sized to fit these instead. */
+  .callegend div{display:flex;gap:7px;align-items:baseline;margin-top:3px;white-space:nowrap}
+  .callegend i{flex:0 0 18px;text-align:center}
   /* Banner on a day we can only show the plan for. */
   .ttbanner{border:1px solid var(--brass);border-radius:9px;padding:9px 12px;margin:0 0 12px;
     font-size:13px;background:color-mix(in srgb,var(--brass) 8%,transparent)}
@@ -476,9 +494,12 @@ function calRender(){
       ${cells.join("")}
     </div>
     <div class="callegend">
-      <i>◦</i> published timetable, nothing observed yet<br>
-      <i style="text-decoration:line-through">00</i> before we started collecting (${CAL.from ?? "—"})<br>
-      <i style="opacity:.5">00</i> past WSF's published horizon (${CAL.to ?? "—"})
+      <div><i style="color:var(--muted);font-size:15px;line-height:0">•</i><span>published
+        timetable, not yet observed</span></div>
+      <div><i style="text-decoration:line-through">00</i><span>before collection began
+        &mdash; ${CAL.from ?? "—"}</span></div>
+      <div><i style="opacity:.45">00</i><span>past WSF's horizon
+        &mdash; ${CAL.to ?? "—"}</span></div>
     </div>`;
 
   pop.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => {
