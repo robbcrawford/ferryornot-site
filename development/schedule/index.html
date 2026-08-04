@@ -842,6 +842,12 @@ function liveRowHTML(s, f){
     ${why}
     <div class="body">
       <div class="kv">${kv}</div>
+      <!-- The boarding curve, same renderer the service-day view uses. It sits above the
+           feed dump because it is the part that answers "will there still be room when I
+           reach the dock" — the numbers above say only how full it is now. Suppressed on
+           a cancelled sailing: a boarding curve for a boat that is not running is a chart
+           of something that stopped meaning anything. -->
+      ${cancelled ? "" : `<div class="sec">Boarding curve</div>${curveSVG(s)}`}
       <div class="sec">What the app receives for this sailing</div>
       ${f
         ? `<pre class="json">${esc(JSON.stringify(f, null, 2))}</pre>`
