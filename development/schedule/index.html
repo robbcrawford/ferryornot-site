@@ -77,8 +77,23 @@
   .delay{font-size:13px;font-variant-numeric:tabular-nums}
   .delay.ok{color:var(--ok)} .delay.warn{color:var(--warn)} .delay.bad{color:var(--bad)}
   .occ{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
-  .bar{width:52px;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+  .bar{width:52px;height:6px;border-radius:3px;background:var(--track);overflow:hidden;
+    display:flex}
   .bar i{display:block;height:100%;background:var(--brass)}
+  /* ★ SEGMENTED BOARDING BAR. The spill sits LEFT because those vehicles board first —
+     a reader judges their own chances by what is left to the RIGHT of it. WSF's figure
+     counts only the second segment, which is why the bar is drawn at all. */
+  .bar i.spill{background:var(--bad)}
+  .bar i.own{background:var(--brass)}
+  /* Overfull is signalled by OUTLINING the track, not by recolouring the second
+     segment. Making both red collapses the two into one block precisely when the
+     split matters most — the reader needs to see how much of a full boat is
+     already spoken for before they arrive. */
+  .bar.overfull{box-shadow:0 0 0 1.5px var(--bad)}
+  .barkey{display:flex;gap:11px;align-items:center;font-size:11px;color:var(--muted);
+    margin-top:5px}
+  .barkey b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;
+    vertical-align:-1px}
   .caret{color:var(--muted);font-size:12px;transition:transform .15s}
   .sail.open .caret{transform:rotate(90deg)}
   .body{display:none;padding:0 13px 14px;border-top:1px solid var(--hairline)}
@@ -417,6 +432,44 @@ function sailClass(s){
 // The `status` half is kept as a belt-and-braces fallback in the same spirit as the
 // app's wire-format rule: if the field ever goes missing server-side, absent must not
 // read as "running".
+// The boarding bar, segmented when a queue carried over from earlier sailings.
+//
+// Spill is drawn FIRST because those vehicles are already in the holding area and board
+// ahead of anyone arriving now. WSF's own figure counts only the scans against this slot,
+// so a single-segment bar shows a boat markedly emptier than it will be.
+//
+// Clamped at the track: a demand that OVERRUNS the deck renders full and turns red rather
+// than drawing past the end of a boat that has a fixed size. The overflow is reported in
+// words by queueNote(), not by geometry.
+function boardingBar(s){
+  const cap = s.spacesLeft != null ? (s.expectedDemand + s.spacesLeft) : null;
+  const spill = s.queueAhead ?? 0;
+  const own = (s.expectedDemand != null && s.queueAhead != null)
+    ? s.expectedDemand - s.queueAhead : null;
+  // No queue, or nothing to divide by: the bar it always was.
+  if (!spill || !cap || own == null){
+    const occ = s.occupancy;
+    return occ != null
+      ? `<span class="bar"><i style="width:${Math.min(100, occ)}%"></i></span>` : "";
+  }
+  const sp = Math.min(spill / cap, 1) * 100;
+  const ow = Math.min(own / cap, 1 - sp / 100) * 100;
+  return `<span class="bar ${s.expectedFull ? "overfull" : ""}"
+    title="${spill} carried over + ${own} booked on, of ${cap}"><i class="spill"
+    style="width:${sp}%"></i><i class="own" style="width:${ow}%"></i></span>`;
+}
+
+// Shown only under a bar that is actually segmented — a key for colours that are not on
+// screen is worse than no key.
+function boardingKey(s){
+  const spill = s.queueAhead ?? 0;
+  if (!spill || s.expectedDemand == null) return "";
+  const own = s.expectedDemand - spill;
+  return `<div class="barkey"><span><b style="background:var(--bad)"></b>${spill}
+    carried over</span><span><b style="background:var(--brass)"></b>${own}
+    booked on</span></div>`;
+}
+
 function isCancelled(s){ return !!s.cancelled || s.status === "CANCELED"; }
 
 // ---- service-day calendar ---------------------------------------------------
@@ -681,7 +734,7 @@ function sailingHTML(s, showDir){
         : s.delay != null ? `<span class="delay ${delayClass(s.delay)}">+${s.delay}m</span>` : ""}
       ${swapBadge}
       <div class="occ">
-        ${occ != null ? `<span>${occ}%</span><span class="bar"><i style="width:${Math.min(100,occ)}%"></i></span>` : ""}
+        ${occ != null ? `<span>${occ}%</span>${boardingBar(s)}` : boardingBar(s)}
       </div>
     </div>`;
   return `<div class="sail ${sailClass(s)}" data-id="${s.id}">
@@ -1038,7 +1091,7 @@ function liveRowHTML(s, f){
 
   const occ = s.occupancy != null
     ? `<span class="occ"><span>${s.occupancy}%</span>
-         <span class="bar"><i style="width:${Math.min(100, s.occupancy)}%"></i></span></span>` : "";
+         ${boardingBar(s)}</span>` : "";
 
   const why = cancelled && s.cancelPhrase
     ? `<div class="lsub"><span class="why">WSF: “${esc(s.cancelPhrase)}”</span></div>` : "";
@@ -1091,6 +1144,7 @@ function liveRowHTML(s, f){
       <div class="sec">${cancelled ? "Boarding when cancelled" : "Boarding curve"}</div>
       ${cancelled || s.dq?.includes("non_revenue") ? spillNote(s) : ""}
       ${queueNote(s)}
+      ${boardingKey(s)}
       ${curveSVG(s)}
       <div class="sec">What the app receives for this sailing</div>
       ${f
