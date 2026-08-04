@@ -212,6 +212,11 @@
   .bul summary{cursor:pointer;font-size:12px;color:var(--brass)}
   .bul .full{margin-top:7px;font-size:12px;line-height:1.6;white-space:pre-wrap;
     max-height:260px;overflow:auto;color:var(--muted)}
+  /* The boundary between recorded fact and current claim. */
+  .nowline{display:flex;align-items:center;gap:9px;margin:16px 0 7px;
+    font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--brass)}
+  .nowline::after{content:"";flex:1;border-top:1px solid var(--brass);opacity:.55}
+  .nowline span{white-space:nowrap;font-variant-numeric:tabular-nums}
   .noticebox{margin-top:26px;border-top:1px solid var(--hairline);padding-top:14px}
   .noticebox>summary{cursor:pointer;font-size:13px;color:var(--muted)}
   .noticebox>summary:hover{color:var(--brass)}
@@ -258,11 +263,6 @@
     <div data-when="day"><label for="groupby">Group by</label><select id="groupby">
       <option value="terminal">Direction</option>
       <option value="vessel" selected>Vessel</option>
-    </select></div>
-    <div data-when="live"><label for="horizon">Horizon</label><select id="horizon">
-      <option value="120">Next 2 hours</option>
-      <option value="360" selected>Next 6 hours — what the app asks for</option>
-      <option value="720">Next 12 hours</option>
     </select></div>
     <div class="spacer"></div>
     <div id="status" class="sub" style="margin:0"></div>
@@ -684,55 +684,69 @@ function bulletinHTML(b){
 }
 
 // One sailing, as a rider-facing claim first and an internals dump second.
-function liveRowHTML(s, feedRow){
-  const gone = !!s.actual;
-  const cls = s.cancelled ? "cancelled"
-            : gone ? "gone " + (s.delay == null ? "" : s.delay <= 5 ? "ontime"
-                     : s.delay <= 20 ? "late" : "verylate")
-            : s.delay == null ? "" : s.delay <= 5 ? "ontime"
-              : s.delay <= 20 ? "late" : "verylate";
+// ONE SAILING. The operational detail comes from schedule_live; every TIME and every
+// claim about lateness comes from the app feed, because the feed is the thing under
+// review. There is no model here to show: a departure is either observed, or it is the
+// vessel's last observed delay carried forward (persistence), or we say nothing and
+// print the timetable.
+const sign = (m) => (m > 0 ? "+" : "") + m + "m";
 
-  // What the rider is actually told. `usable` is the measured promotion gate: below it
-  // the app shows the published timetable, because past chain depth 1 our number has
-  // been measured WORSE than the schedule. Saying "predicted 15:42" on a row the app
-  // will never print as 15:42 is the exact confusion this view has to avoid.
-  const served = feedRow ? feedRow.usable : s.usable;
-  const shown = s.actual ? pacTime(s.actual)
-              : s.appearsNotToHaveRun ? "overdue"
-              : served && s.predicted ? pacTime(s.predicted)
+function liveRowHTML(s, f){
+  const gone = !!(f?.actual_depart ?? s.actual);
+  const delay = f?.delay_minutes ?? null;
+  const basis = f?.basis ?? (f ? "schedule" : null);
+  const cls = s.cancelled ? "cancelled"
+            : (gone ? "gone " : "") + (delay == null ? ""
+               : delay <= 5 ? "ontime" : delay <= 20 ? "late" : "verylate");
+
+  // The headline is what a rider would be told, in the order of what we actually know:
+  // when it went, then our carried-forward estimate, then the printed slot.
+  // OVERDUE IS DERIVED FROM THE CLOCK, not from the feed's `appears_not_to_have_run`.
+  // That flag is written by the demoted predictor's refresh pass, so it is an artifact
+  // we no longer drive anything from — and it disagrees with the record: sailings an
+  // hour past their slot with nothing observed were coming back false and rendering as
+  // an ordinary timetable row. 20 minutes of grace so a merely-late boat is not libelled.
+  const overdue = !gone && !s.cancelled &&
+                  Date.now() - new Date(s.sched).getTime() > 20 * 60000;
+  const shown = gone ? pacTime(f?.actual_depart ?? s.actual)
+              : overdue ? "no departure seen"
+              : (f?.usable && f?.predicted_depart) ? pacTime(f.predicted_depart)
               : pacTime(s.sched);
 
-  // What sits under the headline time, and it changes meaning with the row. On a served
-  // row the headline IS our prediction, so the useful second line is the printed slot it
-  // is measured against. On a withheld row the headline is the printed slot, so repeating
-  // it says nothing — the informative line there is the number we decided NOT to show.
-  const sign = (m) => (m > 0 ? "+" : "") + m + "m";
-  const sub = (!served && !s.actual && !s.cancelled && s.predicted)
-    ? `<span class="ct-sched" data-lab="withheld ">${pacTime(s.predicted)}${
-         s.delay != null ? ` (${sign(s.delay)})` : ""}</span>`
-    : `<span class="ct-sched">${pacTime(s.sched)}</span>`;
-  // The delay chip is only printed where the number is one a rider would actually be
-  // given: a measured delay once the boat has gone, or a forecast we are willing to
-  // serve. Printing "+5m" beside a headline that deliberately shows the timetable states
-  // two different departure times at once.
-  const delayChip = (s.delay != null && !s.cancelled && (s.actual || served))
-    ? `<span class="delay ${delayClass(s.delay)}">${sign(s.delay)}</span>` : "";
+  // A BOAT STILL AT THE DOCK IS NOT "+38 LATE" — IT IS LATER EVERY MINUTE. On an overdue
+  // slot the carried estimate is a floor, not a measurement: whatever we thought, the
+  // sailing is at least as late as the clock says and still growing. Printing the plain
+  // estimate there states a number we have already been proven wrong about.
+  const overdueBy = Math.round((Date.now() - new Date(s.sched).getTime()) / 60000);
+  const delayChip = s.cancelled ? ""
+    : overdue
+      ? `<span class="delay ${delayClass(overdueBy)}" title="Nothing observed yet — at
+           least this late, and growing">≥&nbsp;${sign(Math.max(overdueBy, delay ?? 0))}</span>`
+      : delay != null
+        ? `<span class="delay ${delayClass(delay)}">${sign(delay)}</span>` : "";
 
-  const band = (!gone && s.bandLo && s.bandHi)
-    ? `<span class="band" title="Challenger band, ${esc(s.bandLevel || "?")}, confidence ${
-         esc(s.bandConfidence || "?")}">band <b>${pacTime(s.bandLo)}–${pacTime(s.bandHi)}</b></span>`
+  // WSF'S OWN NUMBER, SHOWN BESIDE OURS RATHER THAN BLENDED INTO IT. When both exist
+  // they are two independent claims about the same thing and the gap between them is
+  // the single most useful number on the row — agreement is corroboration, divergence
+  // is the thing to go and look at.
+  const wsf = (f?.wsf_stated_low != null)
+    ? `<span class="band" title="WSF's own published figure for this direction">WSF <b>${
+         f.wsf_stated_low}${f.wsf_stated_high && f.wsf_stated_high !== f.wsf_stated_low
+           ? "–" + f.wsf_stated_high : ""}m</b></span>`
     : "";
 
   const pills = [];
   if (s.cancelled) pills.push('<span class="pill dead">cancelled</span>');
-  else if (s.appearsNotToHaveRun) pills.push('<span class="pill dead">no departure seen</span>');
-  if (!gone && !s.cancelled) {
-    pills.push(served
-      ? '<span class="pill served">model shown</span>'
-      : '<span class="pill withheld">timetable shown</span>');
+  else if (overdue) pills.push('<span class="pill dead">overdue</span>');
+  if (!gone && !s.cancelled && !overdue) {
+    pills.push(basis === "persistence"
+      ? `<span class="pill served" title="${f.anchor_vessel ? esc(f.anchor_vessel) + " last went " +
+           sign(f.carried_delay_minutes) + ", " + f.anchor_age_minutes + " min ago" : ""}">persistence ${
+           f.carried_delay_minutes != null ? sign(f.carried_delay_minutes) : ""}</span>`
+      : '<span class="pill withheld">timetable — no fresh anchor</span>');
   }
-  if (s.priorSoldOut) pills.push('<span class="pill risk">prior sold out</span>');
-  if (!feedRow) pills.push('<span class="pill dead">not in feed</span>');
+  if (s.priorSoldOut ?? f?.prior_sold_out) pills.push('<span class="pill risk">prior sold out</span>');
+  if (!f) pills.push('<span class="pill dead">not in feed</span>');
 
   const occ = s.occupancy != null
     ? `<span class="occ"><span>${s.occupancy}%</span>
@@ -743,16 +757,19 @@ function liveRowHTML(s, feedRow){
 
   const kv = [
     ["scheduled", pacTime(s.sched)],
-    ["model says", s.predicted ? pacTime(s.predicted) : "—"],
-    ["band", s.bandLo ? `${pacTime(s.bandLo)}–${pacTime(s.bandHi)}` : "—"],
-    ["band model", esc(s.bandLevel || "—") + (s.bandConfidence ? ` (${esc(s.bandConfidence)})` : "")],
-    ["band anchor", s.bandAnchor != null ? `+${s.bandAnchor}m at h${s.bandHorizon ?? "?"}` : "—"],
-    ["confidence", esc(s.confidence || "—") + (s.depth != null ? ` (depth ${s.depth})` : "")],
-    ["basis", esc(s.basis || "—")],
-    ["vessel", esc(s.vessel || s.plannedVessel || "—") +
-       (s.vesselLate != null ? ` · ${s.vesselLate}m late` : "")],
+    ["actual departure", pacTime(f?.actual_depart ?? s.actual)],
+    ["actual arrival", pacTime(s.arrived)],
+    ["estimate", f?.predicted_depart ? pacTime(f.predicted_depart) : "—"],
+    ["source", esc(basis || "—")],
+    ["anchor", f?.carried_delay_minutes != null
+       ? `${esc(f.anchor_vessel || "?")} ${sign(f.carried_delay_minutes)}, ${
+            f.anchor_age_minutes}m ago` : "—"],
+    ["WSF says", f?.wsf_stated_low != null
+       ? `${f.wsf_stated_low}–${f.wsf_stated_high}m behind` : "—"],
+    ["vessel", esc(s.vessel || s.plannedVessel || "—")],
     ["planned vessel", esc(s.plannedVessel || "—")],
     ["crossing", s.crossing != null ? s.crossing + " min" : "—"],
+    ["turnaround", s.turnaround != null ? s.turnaround + " min" : "—"],
     ["drive-up", s.driveUpTotal != null
        ? (s.driveUpTotal - (s.driveUpRemaining ?? 0)) + " / " + s.driveUpTotal : "—"],
     ["terminal wait", s.waitHours == null ? "unknown"
@@ -762,18 +779,18 @@ function liveRowHTML(s, feedRow){
   return `<div class="lrow ${cls}" data-id="${esc(s.id)}">
     <div class="lhead" title="${esc(s.id)}">
       <span class="caret">▸</span>
-      <span class="lt ${gone ? "act" : (served ? "pred" : "")}">${shown}</span>
-      ${sub}
+      <span class="lt ${gone ? "act" : (f?.usable ? "pred" : "")}">${shown}</span>
+      <span class="ct-sched">${pacTime(s.sched)}</span>
       ${delayChip}
-      ${band}
+      ${wsf}
       <span class="rowend">${occ}${pills.join("")}</span>
     </div>
     ${why}
     <div class="body">
       <div class="kv">${kv}</div>
       <div class="sec">What the app receives for this sailing</div>
-      ${feedRow
-        ? `<pre class="json">${esc(JSON.stringify(feedRow, null, 2))}</pre>`
+      ${f
+        ? `<pre class="json">${esc(JSON.stringify(f, null, 2))}</pre>`
         : `<pre class="json missing">This sailing is not in the /predictions payload.
 The app cannot show it at all.</pre>`}
     </div>
@@ -794,8 +811,11 @@ function renderLive(live, feed){
   // ---- the honesty banner. Reads the two payloads against each other and says what a
   // rider would be told, rather than what we happen to know.
   const feedMissing = sailings.filter(s => !byKey.has(keyOf(s.direction, s.sched)));
+  const rows = sailings.map(s => byKey.get(keyOf(s.direction, s.sched))).filter(Boolean);
+  const observed = rows.filter(r => r.basis === "observed");
   const upcoming = sailings.filter(s => !s.actual && !s.cancelled);
-  const withheld = upcoming.filter(s => !(byKey.get(keyOf(s.direction, s.sched))?.usable ?? s.usable));
+  const carried = rows.filter(r => r.basis === "persistence");
+  const bare = rows.filter(r => r.basis === "schedule" && !r.departed);
   const cancelled = sailings.filter(s => s.cancelled);
   const feedBroken = !feed;
   const parts = [];
@@ -803,15 +823,18 @@ function renderLive(live, feed){
     parts.push(`<b>The app feed did not answer.</b> Everything below is what we know, not
       what a rider is being told.`);
   } else {
-    parts.push(`App feed carries <b>${feed.sailings.length}</b> sailings across all routes,
-      generated ${pacTime(feed.generatedAt)}.`);
+    parts.push(`App feed carries the whole service day —
+      <b>${feed.sailings.length}</b> sailings across all routes, generated ${
+      pacTime(feed.generatedAt)}.`);
     if (feedMissing.length) {
       parts.push(`<b>${feedMissing.length}</b> of this route's sailings ${
         feedMissing.length === 1 ? "is" : "are"} missing from it.`);
     }
-    parts.push(`Of <b>${upcoming.length}</b> still to depart here,
-      <b>${withheld.length}</b> fall back to the published timetable
-      <span class="note">(chain depth past 1, where the model has measured worse than
+    parts.push(`On this route: <b>${observed.length}</b> departures we recorded and WSF no
+      longer publishes, <b>${carried.length}</b> ahead carrying their vessel's last
+      observed delay, <b>${bare.length}</b> on the bare timetable
+      <span class="note">(no departure anchor inside ${
+        feed.anchorMaxAgeMinutes ?? 120} minutes, past which a carried delay stops beating
       the schedule)</span>.`);
   }
   if (cancelled.length) parts.push(`<b>${cancelled.length}</b> cancelled by bulletin.`);
@@ -843,12 +866,31 @@ function renderLive(live, feed){
     if (!dirs.has(s.direction)) dirs.set(s.direction, { label: s.dirLabel, rows: [] });
     dirs.get(s.direction).rows.push(s);
   }
+  // A NOW LINE, because the column is a whole day rather than a forward window and the
+  // eye needs the boundary between "this is what happened" and "this is what we are
+  // claiming". Placed by CLOCK TIME rather than after the last departed sailing: on a
+  // disrupted evening a boat can still be sitting at the berth past its slot, and the
+  // divider must not imply it has gone.
+  const now = Date.now();
+  const withDivider = (rows) => {
+    let placed = false;
+    return rows.map(s => {
+      const f = byKey.get(keyOf(s.direction, s.sched));
+      let lead = "";
+      if (!placed && new Date(s.sched).getTime() > now) {
+        placed = true;
+        lead = `<div class="nowline"><span>now · ${pacTime(new Date().toISOString())}</span></div>`;
+      }
+      return lead + liveRowHTML(s, f);
+    }).join("");
+  };
+
   $("livecols").innerHTML = dirs.size
     ? [...dirs.entries()].sort((a,b) => a[0].localeCompare(b[0])).map(([code, d]) => `
         <div class="lcol">
           <div class="coltitle">${esc(d.label)}
             <span class="muted">(${d.rows.length})</span></div>
-          ${d.rows.map(s => liveRowHTML(s, byKey.get(keyOf(s.direction, s.sched)))).join("")}
+          ${withDivider(d.rows)}
         </div>`).join("")
     : '<div class="tl-empty">Nothing scheduled in this window.</div>';
 
@@ -859,11 +901,10 @@ function renderLive(live, feed){
 }
 
 async function loadLive(){
-  const horizon = $("horizon").value;
   $("status").textContent = "Loading…";
   let live;
   try {
-    live = await call(`?live=1&horizon=${encodeURIComponent(horizon)}`);
+    live = await call("?live=1");
   } catch (e) {
     if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
     return;
@@ -873,7 +914,7 @@ async function loadLive(){
   // banner says the rider half is missing.
   let feed = null;
   try {
-    const res = await fetch(`${FEED}?horizon=${encodeURIComponent(horizon)}`);
+    const res = await fetch(FEED);
     if (res.ok) feed = await res.json();
   } catch { /* reported in the banner */ }
 
@@ -903,9 +944,10 @@ async function load(){
 // for, while the live view answers "what are we telling riders right now", which is the
 // one worth landing on.
 const BLURB = {
-  live: `What the model is predicting right now, next to the exact payload the app is
-     being handed. Cancellations are WSF's own words; a sailing marked “timetable shown”
-     is one where the app deliberately prints the published time instead of ours.`,
+  live: `The whole service day as the app receives it: departures we actually recorded —
+     WSF drops those from its own feed within minutes — and, ahead of now, each vessel's
+     last observed delay carried forward. No model; that predictor was demoted on
+     2026-08-03. WSF's own stated figure is shown beside ours, never blended into it.`,
   day: `Scheduled, predicted and actual departures, with the boarding curve and
      prediction trail behind each sailing. Hover a sailing to copy its id.`,
 };
@@ -965,7 +1007,6 @@ async function boot(){
     $("date").onchange = load;
     // Grouping is a view of data already in hand — re-render, do not refetch.
     $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
-    $("horizon").onchange = loadLive;
     $("view").onchange = applyView;
 
     $("view").value = location.hash === "#day" ? "day" : "live";
