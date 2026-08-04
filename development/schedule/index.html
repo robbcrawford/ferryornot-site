@@ -153,6 +153,79 @@
   .gap.unrecorded-sailings .gap-lab{color:var(--bad)}
   .gap.no-telemetry .gap-lab,.gap.extended-layover .gap-lab,
   .gap.repositioning .gap-lab,.gap.unexplained .gap-lab{color:var(--muted)}
+
+  /* ---- live view ----
+     A plain chronological list per direction, NOT the shared timeline. The timeline
+     earns its complexity by making a whole disrupted day legible at once; the live view
+     is fifteen rows about the next few hours, and the question is "what will a rider be
+     told", which reads better as a list than as a scaled axis. */
+  .live{display:grid;gap:22px;margin-top:18px;
+    grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+  .lcol .coltitle{display:flex;align-items:baseline;gap:8px}
+  .lrow{background:var(--card);border:1px solid var(--hairline);border-radius:10px;
+    margin-top:9px;overflow:hidden}
+  .lrow.late{border-left:3px solid var(--warn)}
+  .lrow.verylate{border-left:3px solid var(--bad)}
+  .lrow.ontime{border-left:3px solid var(--ok)}
+  .lrow.gone{opacity:.62}
+  .lrow.cancelled{border-left:3px solid var(--bad);
+    background:color-mix(in srgb,var(--bad) 7%,var(--card))}
+  .lhead{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;
+    user-select:none;flex-wrap:wrap}
+  .lhead:hover{background:color-mix(in srgb,var(--brass) 7%,transparent)}
+  .lrow.open .caret{transform:rotate(90deg)}
+  .lrow .body{display:none;padding:0 12px 13px;border-top:1px solid var(--hairline)}
+  .lrow.open .body{display:block}
+  .lt{font-size:17px;font-variant-numeric:tabular-nums}
+  .lt.act{font-weight:600} .lt.pred{color:var(--brass)}
+  .lrow.cancelled .lt{text-decoration:line-through;color:var(--bad)}
+  /* The band, printed as the range it is. Placed right after the point estimate so the
+     two are read together — a single number with a 10-minute band beside it is a very
+     different claim from the same number alone. */
+  .band{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;
+    white-space:nowrap}
+  .band b{font-weight:600;color:var(--ink)}
+  .pill{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--hairline);
+    color:var(--muted);white-space:nowrap}
+  .pill.served{border-color:var(--ok);color:var(--ok)}
+  .pill.withheld{border-color:var(--muted)}
+  .pill.risk{border-color:var(--warn);color:var(--warn);
+    background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .pill.dead{border-color:var(--bad);color:var(--bad)}
+  .rowend{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    justify-content:flex-end}
+  .lsub{font-size:12px;color:var(--muted);padding:0 12px 9px;margin-top:-4px}
+  .lsub .why{color:var(--bad)}
+  /* The second line's label changes with what it is describing — see liveRowHTML. */
+  .ct-sched[data-lab]::before{content:attr(data-lab)}
+
+  /* ---- bulletins ---- */
+  .buls{display:grid;gap:10px;margin:16px 0 4px;
+    grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+  .bul{background:var(--card);border:1px solid var(--hairline);border-left:3px solid var(--hairline);
+    border-radius:9px;padding:10px 12px;font-size:13px}
+  .bul.op{border-left-color:var(--bad)}
+  .bul h4{margin:0 0 4px;font-size:13.5px;font-weight:600;line-height:1.4}
+  .bul .meta{font-size:11px;color:var(--muted);letter-spacing:.03em;text-transform:uppercase}
+  .bul p{margin:5px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55}
+  .bul details{margin-top:6px}
+  .bul summary{cursor:pointer;font-size:12px;color:var(--brass)}
+  .bul .full{margin-top:7px;font-size:12px;line-height:1.6;white-space:pre-wrap;
+    max-height:260px;overflow:auto;color:var(--muted)}
+  .noticebox{margin-top:26px;border-top:1px solid var(--hairline);padding-top:14px}
+  .noticebox>summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  .noticebox>summary:hover{color:var(--brass)}
+
+  /* ---- the honesty banner ---- */
+  .verdict{margin:14px 0 0;padding:11px 14px;border-radius:9px;font-size:13.5px;
+    border:1px solid var(--hairline);background:var(--card);line-height:1.6}
+  .verdict.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--card))}
+  .verdict b{font-variant-numeric:tabular-nums}
+  .verdict .note{color:var(--muted);font-size:12.5px}
+  pre.json{margin:8px 0 0;padding:10px 12px;border-radius:8px;background:var(--track);
+    font-size:11.5px;line-height:1.55;overflow:auto;max-height:300px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+  pre.json.missing{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
 </style>
 </head>
 <body>
@@ -173,22 +246,39 @@
 <!-- gate is injected by ../auth.js -->
 <main class="wrap" id="app" style="display:none">
   <h1>Schedule Inspector</h1>
-  <p class="sub">Scheduled, predicted and actual departures, with the boarding curve and
-     prediction trail behind each sailing. Hover a sailing to copy its id.</p>
+  <p class="sub" id="blurb"></p>
 
   <div class="controls">
+    <div><label for="view">View</label><select id="view">
+      <option value="live">Live</option>
+      <option value="day">Service day</option>
+    </select></div>
     <div><label for="route">Route</label><select id="route"></select></div>
-    <div><label for="date">Service day</label><select id="date"></select></div>
-    <div><label for="groupby">Group by</label><select id="groupby">
+    <div data-when="day"><label for="date">Service day</label><select id="date"></select></div>
+    <div data-when="day"><label for="groupby">Group by</label><select id="groupby">
       <option value="terminal">Direction</option>
       <option value="vessel" selected>Vessel</option>
+    </select></div>
+    <div data-when="live"><label for="horizon">Horizon</label><select id="horizon">
+      <option value="120">Next 2 hours</option>
+      <option value="360" selected>Next 6 hours — what the app asks for</option>
+      <option value="720">Next 12 hours</option>
     </select></div>
     <div class="spacer"></div>
     <div id="status" class="sub" style="margin:0"></div>
   </div>
 
-  <div class="daybar" id="daybar"></div>
-  <div class="cols" id="cols"></div>
+  <div id="dayview" hidden>
+    <div class="daybar" id="daybar"></div>
+    <div class="cols" id="cols"></div>
+  </div>
+
+  <div id="liveview" hidden>
+    <div class="verdict" id="verdict"></div>
+    <div class="buls" id="buls"></div>
+    <div class="live" id="livecols"></div>
+    <div id="notices"></div>
+  </div>
 </main>
 
 <footer><div class="wrap">Internal tool — not linked from the site. Data is WSF telemetry
@@ -198,6 +288,12 @@
 import { requireAuth, authedFetch, signOut } from "../auth.js";
 
 const API = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/schedule";
+// The rider's endpoint, called here EXACTLY as the app calls it: no auth, no route, no
+// headers of ours. That is the point of the live view — not a rendering of what we know,
+// but a rendering of what we hand the phone. Reaching for the authenticated endpoint to
+// fill a gap in this payload would quietly turn the preview into a lie, which is the
+// failure mode the whole view exists to catch.
+const FEED = "https://fhodvdsrlbahtxsgptky.functions.supabase.co/predictions";
 const $ = (id) => document.getElementById(id);
 
 // ---- data ----------------------------------------------------------------
@@ -403,8 +499,10 @@ function turnMarkup(prev, s, y, chipTop){
 }
 
 // Labels come from known_berths, which is owner-editable, so escape rather than trust.
-const esc = (t) => String(t ?? "").replace(/[<>&]/g,
-  (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+// Quotes are in the set because the live view interpolates WSF's own bulletin prose into
+// title="..." attributes, and that text is written by someone else entirely.
+const esc = (t) => String(t ?? "").replace(/[<>&"']/g,
+  (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // An explained hole in the boat's day, drawn as the span it occupies on the axis —
 // the same treatment as the berth line, because it IS the berth line's big sibling:
@@ -539,6 +637,251 @@ function render(payload){
   });
 }
 
+// ==========================================================================
+// LIVE VIEW — what the model says right now, next to what the app is handed.
+//
+// Two payloads, fetched separately and joined here:
+//
+//   schedule_live()  (authenticated)  everything we know: the cascade, the challenger
+//                                     band, occupancy, the named vessel, cancellations
+//   /predictions     (public, no auth) the rider's feed, byte-for-byte
+//
+// Rendering only the first would be the easy version and would have hidden a five-day
+// outage: on 2026-07-30 a migration dropped `departed` and `usable` from the feed, the
+// app's decoder throws on a missing key, and PredictionClient swallows its own errors —
+// so every rider silently fell back to the on-device forecast while every internal view
+// still looked perfect. A preview of what we serve has to be built from what we serve.
+// ==========================================================================
+
+const LIVE_REFRESH_MS = 60000;   // the collector re-cascades once a minute; matching it
+let liveTimer = null;
+
+// Both payloads carry the same scheduled departure straight out of the same column, so
+// the instant is the join key. Compared as epoch ms rather than as strings: Postgres
+// emits fractional seconds on some timestamps and not others.
+const keyOf = (dir, sched) => dir + "@" + new Date(sched).getTime();
+
+// OPERATIONAL BULLETINS LEAD AND SHOW THEIR TEXT; NOTICES COLLAPSE TO A TITLE. On a
+// normal day WSF has five to ten bulletins in force and most are lane closures and
+// elevator outages — expanded equally they push the sailings, which are the point of the
+// page, off the first screen entirely. `operational` is WSF's own distinction between
+// "service is different today" and "here is a notice", so it is the right axis to sort
+// and size on.
+function bulletinHTML(b){
+  const dirs = (b.directions || []).join(", ");
+  const body = (b.body || "").replace(/<[^>]*>/g, " ").replace(/\s{2,}/g, " ").trim();
+  const showText = b.operational && b.text;
+  const detail = [showText ? "" : (b.text || ""), body !== (b.text || "").trim() ? body : ""]
+    .filter(Boolean).join("\n\n");
+  return `<div class="bul ${b.operational ? "op" : ""}">
+    <div class="meta">${b.operational ? "Operational" : "Notice"} · ${pacTime(b.publishedAt)}
+      · ${esc(b.allRoutes ? "all routes" : dirs)}</div>
+    <h4>${esc(b.title)}</h4>
+    ${showText ? `<p>${esc(b.text)}</p>` : ""}
+    ${detail ? `<details><summary>Full bulletin</summary>
+           <div class="full">${esc(detail)}</div></details>` : ""}
+  </div>`;
+}
+
+// One sailing, as a rider-facing claim first and an internals dump second.
+function liveRowHTML(s, feedRow){
+  const gone = !!s.actual;
+  const cls = s.cancelled ? "cancelled"
+            : gone ? "gone " + (s.delay == null ? "" : s.delay <= 5 ? "ontime"
+                     : s.delay <= 20 ? "late" : "verylate")
+            : s.delay == null ? "" : s.delay <= 5 ? "ontime"
+              : s.delay <= 20 ? "late" : "verylate";
+
+  // What the rider is actually told. `usable` is the measured promotion gate: below it
+  // the app shows the published timetable, because past chain depth 1 our number has
+  // been measured WORSE than the schedule. Saying "predicted 15:42" on a row the app
+  // will never print as 15:42 is the exact confusion this view has to avoid.
+  const served = feedRow ? feedRow.usable : s.usable;
+  const shown = s.actual ? pacTime(s.actual)
+              : s.appearsNotToHaveRun ? "overdue"
+              : served && s.predicted ? pacTime(s.predicted)
+              : pacTime(s.sched);
+
+  // What sits under the headline time, and it changes meaning with the row. On a served
+  // row the headline IS our prediction, so the useful second line is the printed slot it
+  // is measured against. On a withheld row the headline is the printed slot, so repeating
+  // it says nothing — the informative line there is the number we decided NOT to show.
+  const sign = (m) => (m > 0 ? "+" : "") + m + "m";
+  const sub = (!served && !s.actual && !s.cancelled && s.predicted)
+    ? `<span class="ct-sched" data-lab="withheld ">${pacTime(s.predicted)}${
+         s.delay != null ? ` (${sign(s.delay)})` : ""}</span>`
+    : `<span class="ct-sched">${pacTime(s.sched)}</span>`;
+  // The delay chip is only printed where the number is one a rider would actually be
+  // given: a measured delay once the boat has gone, or a forecast we are willing to
+  // serve. Printing "+5m" beside a headline that deliberately shows the timetable states
+  // two different departure times at once.
+  const delayChip = (s.delay != null && !s.cancelled && (s.actual || served))
+    ? `<span class="delay ${delayClass(s.delay)}">${sign(s.delay)}</span>` : "";
+
+  const band = (!gone && s.bandLo && s.bandHi)
+    ? `<span class="band" title="Challenger band, ${esc(s.bandLevel || "?")}, confidence ${
+         esc(s.bandConfidence || "?")}">band <b>${pacTime(s.bandLo)}–${pacTime(s.bandHi)}</b></span>`
+    : "";
+
+  const pills = [];
+  if (s.cancelled) pills.push('<span class="pill dead">cancelled</span>');
+  else if (s.appearsNotToHaveRun) pills.push('<span class="pill dead">no departure seen</span>');
+  if (!gone && !s.cancelled) {
+    pills.push(served
+      ? '<span class="pill served">model shown</span>'
+      : '<span class="pill withheld">timetable shown</span>');
+  }
+  if (s.priorSoldOut) pills.push('<span class="pill risk">prior sold out</span>');
+  if (!feedRow) pills.push('<span class="pill dead">not in feed</span>');
+
+  const occ = s.occupancy != null
+    ? `<span class="occ"><span>${s.occupancy}%</span>
+         <span class="bar"><i style="width:${Math.min(100, s.occupancy)}%"></i></span></span>` : "";
+
+  const why = s.cancelled && s.cancelPhrase
+    ? `<div class="lsub"><span class="why">WSF: “${esc(s.cancelPhrase)}”</span></div>` : "";
+
+  const kv = [
+    ["scheduled", pacTime(s.sched)],
+    ["model says", s.predicted ? pacTime(s.predicted) : "—"],
+    ["band", s.bandLo ? `${pacTime(s.bandLo)}–${pacTime(s.bandHi)}` : "—"],
+    ["band model", esc(s.bandLevel || "—") + (s.bandConfidence ? ` (${esc(s.bandConfidence)})` : "")],
+    ["band anchor", s.bandAnchor != null ? `+${s.bandAnchor}m at h${s.bandHorizon ?? "?"}` : "—"],
+    ["confidence", esc(s.confidence || "—") + (s.depth != null ? ` (depth ${s.depth})` : "")],
+    ["basis", esc(s.basis || "—")],
+    ["vessel", esc(s.vessel || s.plannedVessel || "—") +
+       (s.vesselLate != null ? ` · ${s.vesselLate}m late` : "")],
+    ["planned vessel", esc(s.plannedVessel || "—")],
+    ["crossing", s.crossing != null ? s.crossing + " min" : "—"],
+    ["drive-up", s.driveUpTotal != null
+       ? (s.driveUpTotal - (s.driveUpRemaining ?? 0)) + " / " + s.driveUpTotal : "—"],
+    ["terminal wait", s.waitHours == null ? "unknown"
+       : (s.waitHours === 0 ? "no extended wait" : s.waitHours + "h")],
+  ].map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join("");
+
+  return `<div class="lrow ${cls}" data-id="${esc(s.id)}">
+    <div class="lhead" title="${esc(s.id)}">
+      <span class="caret">▸</span>
+      <span class="lt ${gone ? "act" : (served ? "pred" : "")}">${shown}</span>
+      ${sub}
+      ${delayChip}
+      ${band}
+      <span class="rowend">${occ}${pills.join("")}</span>
+    </div>
+    ${why}
+    <div class="body">
+      <div class="kv">${kv}</div>
+      <div class="sec">What the app receives for this sailing</div>
+      ${feedRow
+        ? `<pre class="json">${esc(JSON.stringify(feedRow, null, 2))}</pre>`
+        : `<pre class="json missing">This sailing is not in the /predictions payload.
+The app cannot show it at all.</pre>`}
+    </div>
+  </div>`;
+}
+
+function renderLive(live, feed){
+  const routeSel = $("route").value;
+  // This view redraws itself every minute. Without carrying the expanded rows across,
+  // reading the JSON behind a sailing would be a race against the refresh.
+  const open = new Set([...$("livecols").querySelectorAll(".lrow.open")]
+    .map(el => el.dataset.id));
+  const byKey = new Map();
+  for (const r of (feed?.sailings || [])) byKey.set(keyOf(r.direction_code, r.scheduled_depart), r);
+
+  const sailings = (live.sailings || []).filter(s => routeSel === "all" || s.routeId === routeSel);
+
+  // ---- the honesty banner. Reads the two payloads against each other and says what a
+  // rider would be told, rather than what we happen to know.
+  const feedMissing = sailings.filter(s => !byKey.has(keyOf(s.direction, s.sched)));
+  const upcoming = sailings.filter(s => !s.actual && !s.cancelled);
+  const withheld = upcoming.filter(s => !(byKey.get(keyOf(s.direction, s.sched))?.usable ?? s.usable));
+  const cancelled = sailings.filter(s => s.cancelled);
+  const feedBroken = !feed;
+  const parts = [];
+  if (feedBroken) {
+    parts.push(`<b>The app feed did not answer.</b> Everything below is what we know, not
+      what a rider is being told.`);
+  } else {
+    parts.push(`App feed carries <b>${feed.sailings.length}</b> sailings across all routes,
+      generated ${pacTime(feed.generatedAt)}.`);
+    if (feedMissing.length) {
+      parts.push(`<b>${feedMissing.length}</b> of this route's sailings ${
+        feedMissing.length === 1 ? "is" : "are"} missing from it.`);
+    }
+    parts.push(`Of <b>${upcoming.length}</b> still to depart here,
+      <b>${withheld.length}</b> fall back to the published timetable
+      <span class="note">(chain depth past 1, where the model has measured worse than
+      the schedule)</span>.`);
+  }
+  if (cancelled.length) parts.push(`<b>${cancelled.length}</b> cancelled by bulletin.`);
+  $("verdict").className = "verdict" + (feedBroken || feedMissing.length ? " bad" : "");
+  $("verdict").innerHTML = parts.join(" ");
+
+  // ---- bulletins in force, for the selected route
+  // Operational bulletins sit ABOVE the sailings because they change what the boats do;
+  // notices go below, collapsed. Ranked equally they filled the first screen with lane
+  // closures and elevator outages and pushed the departures — the answer this page
+  // exists to give — off it.
+  const buls = (live.bulletins || []).filter(b =>
+    routeSel === "all" || b.allRoutes || (b.routeIds || []).map(String).includes(routeSel));
+  const ops = buls.filter(b => b.operational);
+  const notices = buls.filter(b => !b.operational);
+  $("buls").innerHTML = ops.length
+    ? ops.map(bulletinHTML).join("")
+    : `<div class="empty">No operational WSF bulletins in force for this route today${
+         notices.length ? ` — ${notices.length} notice${notices.length === 1 ? "" : "s"} below` : ""}.</div>`;
+  $("notices").innerHTML = notices.length
+    ? `<details class="noticebox"><summary>${notices.length} other bulletin${
+         notices.length === 1 ? "" : "s"} in force — terminal notices, closures, ADA</summary>
+       <div class="buls">${notices.map(bulletinHTML).join("")}</div></details>`
+    : "";
+
+  // ---- one column per direction, in time order
+  const dirs = new Map();
+  for (const s of sailings){
+    if (!dirs.has(s.direction)) dirs.set(s.direction, { label: s.dirLabel, rows: [] });
+    dirs.get(s.direction).rows.push(s);
+  }
+  $("livecols").innerHTML = dirs.size
+    ? [...dirs.entries()].sort((a,b) => a[0].localeCompare(b[0])).map(([code, d]) => `
+        <div class="lcol">
+          <div class="coltitle">${esc(d.label)}
+            <span class="muted">(${d.rows.length})</span></div>
+          ${d.rows.map(s => liveRowHTML(s, byKey.get(keyOf(s.direction, s.sched)))).join("")}
+        </div>`).join("")
+    : '<div class="tl-empty">Nothing scheduled in this window.</div>';
+
+  $("livecols").querySelectorAll(".lrow").forEach(row => {
+    if (open.has(row.dataset.id)) row.classList.add("open");
+    row.querySelector(".lhead").onclick = () => row.classList.toggle("open");
+  });
+}
+
+async function loadLive(){
+  const horizon = $("horizon").value;
+  $("status").textContent = "Loading…";
+  let live;
+  try {
+    live = await call(`?live=1&horizon=${encodeURIComponent(horizon)}`);
+  } catch (e) {
+    if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
+    return;
+  }
+  // The app feed is fetched exactly as the app fetches it, so a failure here is a real
+  // finding and must not be styled as a page error: the internals still render, and the
+  // banner says the rider half is missing.
+  let feed = null;
+  try {
+    const res = await fetch(`${FEED}?horizon=${encodeURIComponent(horizon)}`);
+    if (res.ok) feed = await res.json();
+  } catch { /* reported in the banner */ }
+
+  window.__live = live; window.__feed = feed;
+  renderLive(live, feed);
+  $("status").textContent = `as of ${pacTime(live.generatedAt)} · refreshes every minute`;
+}
+
 async function load(){
   const d = $("date").value, r = $("route").value;
   if (!d || !r) return;
@@ -554,11 +897,53 @@ async function load(){
   }
 }
 
+// ---- view switching ------------------------------------------------------
+// The view lives in the URL hash so a view is linkable and survives a reload. Live is
+// the default: the day view answers "what happened", which is a question you go looking
+// for, while the live view answers "what are we telling riders right now", which is the
+// one worth landing on.
+const BLURB = {
+  live: `What the model is predicting right now, next to the exact payload the app is
+     being handed. Cancellations are WSF's own words; a sailing marked “timetable shown”
+     is one where the app deliberately prints the published time instead of ours.`,
+  day: `Scheduled, predicted and actual departures, with the boarding curve and
+     prediction trail behind each sailing. Hover a sailing to copy its id.`,
+};
+
+function applyView(){
+  const v = $("view").value;
+  document.querySelectorAll("[data-when]").forEach(el => {
+    el.style.display = el.dataset.when === v ? "" : "none";
+  });
+  // "All routes" is a live-view option only, so arriving at the day view holding it
+  // would ask schedule_day for a route that does not exist and draw an empty board.
+  if (v === "day" && $("route").value === "all") $("route").value = window.__lastDayRoute;
+  $("dayview").hidden = v !== "day";
+  $("liveview").hidden = v !== "live";
+  $("blurb").textContent = BLURB[v];
+  location.hash = v;
+
+  // Only the live view polls. Leaving the timer running under the day view would keep
+  // re-fetching a payload nobody is looking at, and — worse — would eventually re-render
+  // over a sailing the reader had expanded.
+  clearInterval(liveTimer); liveTimer = null;
+  if (v === "live"){
+    loadLive();
+    liveTimer = setInterval(loadLive, LIVE_REFRESH_MS);
+  } else {
+    load();
+  }
+}
+
 async function boot(){
   try {
     const meta = await call("");
-    $("route").innerHTML = meta.routes.map(r =>
-      `<option value="${r.routeId}">${r.label}</option>`).join("");
+    // "All routes" only in the live view — the day view's timeline is scaled to one
+    // route's sailings and six directions of chips would be unreadable on it.
+    $("route").innerHTML = `<option value="all">All routes</option>` + meta.routes.map(r =>
+      `<option value="${r.routeId}">${esc(r.label)}</option>`).join("");
+    $("route").value = meta.routes[0]?.routeId ?? "all";
+    window.__lastDayRoute = $("route").value;
     const days = meta.days || [];
     $("date").innerHTML = days.map(d => `<option value="${d}">${d}</option>`).join("");
     // Days come back newest-first, but the newest is usually a stub of a handful of
@@ -566,10 +951,25 @@ async function boot(){
     // service-day mismatch. Selecting it opens the inspector on a near-empty board,
     // so default to today and fall back to newest only if today has nothing yet.
     $("date").value = days.includes(pacificToday()) ? pacificToday() : (days[0] ?? "");
-    $("route").onchange = load; $("date").onchange = load;
+
+    $("route").onchange = () => {
+      if ($("view").value === "live"){
+        // Route is a filter over data already in hand, so re-render rather than refetch
+        // — and refetching would be worse than wasteful: the feed is route-blind, so the
+        // second request would return the same bytes.
+        if (window.__live) renderLive(window.__live, window.__feed);
+      } else if ($("route").value === "all"){
+        $("route").value = window.__lastDayRoute; load();
+      } else { window.__lastDayRoute = $("route").value; load(); }
+    };
+    $("date").onchange = load;
     // Grouping is a view of data already in hand — re-render, do not refetch.
     $("groupby").onchange = () => { if (window.__payload) render(window.__payload); };
-    load();
+    $("horizon").onchange = loadLive;
+    $("view").onchange = applyView;
+
+    $("view").value = location.hash === "#day" ? "day" : "live";
+    applyView();
   } catch (e) {
     if (e.message !== "signed out") $("status").textContent = "Error: " + e.message;
   }
