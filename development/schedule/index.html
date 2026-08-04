@@ -534,6 +534,31 @@ function calClose(){ $("calpop").hidden = true; }
 // reads but no drive-up figures at all; printing "0 vehicles displaced" there would be
 // the same lie as claiming comfortable space with no space data. Zero is a measurement,
 // null is an absence, and they get different sentences.
+// What this sailing INHERITS from the boats before it that took nobody.
+//
+// The counterpart to spillNote(): that one is on the sailing which caused the spill —
+// already missed by the time anyone reads it — and this one is on the sailing that
+// receives the queue, which is the row a rider is actually looking at. 2026-08-04: the
+// 12:20 stranded 133 vehicles and the 13:15 behind it showed "28%, plenty of room".
+//
+// The backend decides WHICH sailing inherits (sailing_spill) — the next one in the
+// direction that carries people, counting only the contiguous run of empty sailings
+// behind it. Re-deriving that here would be a second opinion about the same question.
+function inheritedNote(s){
+  const n = s.inheritedVehicles;
+  const unknown = s.inheritedUnknown ?? 0;
+  if (!n && !unknown) return "";
+  const from = s.inheritedFrom === 1 ? "the sailing before it" : `${s.inheritedFrom} sailings before it`;
+  if (!n) {
+    return `<div class="empty">${from === "the sailing before it" ? "The sailing before it" : from}
+      took nobody, but WSF published no drive-up figures for
+      ${unknown === 1 ? "it" : "them"} — the size of the queue it inherited is unknown.</div>`;
+  }
+  const more = unknown > 0 ? ` (plus ${unknown} with no figures published)` : "";
+  return `<div class="spill"><b>${n}</b> vehicle${n === 1 ? "" : "s"} inherited from
+    ${from}${more} — WSF's count for this sailing does not include them.</div>`;
+}
+
 function spillNote(s){
   const n = s.displacedVehicles;
   const pct = s.peakOccupancy;
@@ -1062,7 +1087,8 @@ function liveRowHTML(s, f){
            which is the backlog the decision engine warns about from the other end
            without ever knowing how big it was. -->
       <div class="sec">${cancelled ? "Boarding when cancelled" : "Boarding curve"}</div>
-      ${cancelled ? spillNote(s) : ""}
+      ${cancelled || s.dq?.includes("non_revenue") ? spillNote(s) : ""}
+      ${inheritedNote(s)}
       ${curveSVG(s)}
       <div class="sec">What the app receives for this sailing</div>
       ${f
