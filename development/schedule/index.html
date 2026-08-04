@@ -544,19 +544,21 @@ function calClose(){ $("calpop").hidden = true; }
 // The backend decides WHICH sailing inherits (sailing_spill) — the next one in the
 // direction that carries people, counting only the contiguous run of empty sailings
 // behind it. Re-deriving that here would be a second opinion about the same question.
-function inheritedNote(s){
-  const n = s.inheritedVehicles;
-  const unknown = s.inheritedUnknown ?? 0;
-  if (!n && !unknown) return "";
-  const from = s.inheritedFrom === 1 ? "the sailing before it" : `${s.inheritedFrom} sailings before it`;
-  if (!n) {
-    return `<div class="empty">${from === "the sailing before it" ? "The sailing before it" : from}
-      took nobody, but WSF published no drive-up figures for
-      ${unknown === 1 ? "it" : "them"} — the size of the queue it inherited is unknown.</div>`;
+function queueNote(s){
+  const q = s.queueAhead;
+  if (q == null || q === 0) return "";
+  const cap = s.spacesLeft, full = s.expectedFull;
+  // The queue length alone is alarming without being actionable — 133 ahead of a
+  // 197-space boat that also scanned 55 of its own still leaves room. What decides a
+  // rider's trip is whether the deck runs out, so lead with that.
+  if (full) {
+    return `<div class="spill"><b>${q}</b> carried over from earlier sailings that
+      couldn't take them — enough to FILL this sailing. WSF's figure counts only scans
+      against this slot, so it does not include them.</div>`;
   }
-  const more = unknown > 0 ? ` (plus ${unknown} with no figures published)` : "";
-  return `<div class="spill"><b>${n}</b> vehicle${n === 1 ? "" : "s"} inherited from
-    ${from}${more} — WSF's count for this sailing does not include them.</div>`;
+  return `<div class="spill"><b>${q}</b> carried over from earlier sailings — about
+    <b>${cap}</b> space${cap === 1 ? "" : "s"} left once they board. WSF's figure counts
+    only scans against this slot, so it does not include them.</div>`;
 }
 
 function spillNote(s){
@@ -1088,7 +1090,7 @@ function liveRowHTML(s, f){
            without ever knowing how big it was. -->
       <div class="sec">${cancelled ? "Boarding when cancelled" : "Boarding curve"}</div>
       ${cancelled || s.dq?.includes("non_revenue") ? spillNote(s) : ""}
-      ${inheritedNote(s)}
+      ${queueNote(s)}
       ${curveSVG(s)}
       <div class="sec">What the app receives for this sailing</div>
       ${f
