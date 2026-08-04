@@ -97,6 +97,10 @@
   table.trail td{padding:3px 8px 3px 0;border-top:1px solid var(--hairline)}
   .muted{color:var(--muted)}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  /* The spill line reads as a finding, not a caveat — it is the one number on a
+     cancelled row that changes what the NEXT sailing looks like. */
+  .spill{font-size:13px;padding:8px 0;color:var(--warn)}
+  .spill b{font-variant-numeric:tabular-nums;font-size:15px}
   svg.curve{width:100%;height:120px;display:block}
   .dir{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
     border:1px solid var(--hairline);border-radius:5px;padding:1px 6px;white-space:nowrap}
@@ -347,6 +351,33 @@ function sailClass(s){
 // app's wire-format rule: if the field ever goes missing server-side, absent must not
 // read as "running".
 function isCancelled(s){ return !!s.cancelled || s.status === "CANCELED"; }
+
+// How many vehicles a cancellation pushed onto the next sailing.
+//
+// This is why a cancelled boat's boarding curve is worth drawing: the cars already
+// scanned on do not evaporate, they spill forward. The engine warns about that backlog
+// from the other end ("displaced vehicles make drive-up space tighter than usual") and
+// never knew the size of it. Measured, it ranges from 0 to 133 on a single sailing.
+//
+// ⚠️ NULL IS NOT ZERO. Three of 2026-08-03's cancelled Bremerton sailings have boarding
+// reads but no drive-up figures at all; printing "0 vehicles displaced" there would be
+// the same lie as claiming comfortable space with no space data. Zero is a measurement,
+// null is an absence, and they get different sentences.
+function spillNote(s){
+  const n = s.displacedVehicles;
+  const pct = s.peakOccupancy;
+  if (n == null) {
+    return `<div class="empty">WSF published no drive-up figures for this sailing, so
+      how many vehicles it stranded is unknown${
+        pct != null ? ` — it had reached ${pct}% of the deck` : ""}.</div>`;
+  }
+  if (n === 0) {
+    return `<div class="empty">Cancelled before anything sold — no vehicles displaced
+      onto the next sailing.</div>`;
+  }
+  return `<div class="spill"><b>${n}</b> vehicle${n === 1 ? "" : "s"} displaced onto the
+    next sailing${pct != null ? ` — the deck had reached ${pct}%` : ""}.</div>`;
+}
 
 // Boarding curve. x = minutes until scheduled departure, counting DOWN to 0, which is
 // the axis the cliff actually happens on. Sales anchors marked because "when did this
@@ -844,10 +875,14 @@ function liveRowHTML(s, f){
       <div class="kv">${kv}</div>
       <!-- The boarding curve, same renderer the service-day view uses. It sits above the
            feed dump because it is the part that answers "will there still be room when I
-           reach the dock" — the numbers above say only how full it is now. Suppressed on
-           a cancelled sailing: a boarding curve for a boat that is not running is a chart
-           of something that stopped meaning anything. -->
-      ${cancelled ? "" : `<div class="sec">Boarding curve</div>${curveSVG(s)}`}
+           reach the dock" — the numbers above say only how full it is now.
+           ON A CANCELLED SAILING IT IS THE SIZE OF THE SPILL, not a dead chart: the
+           vehicles already scanned onto a withdrawn boat roll onto the next departure,
+           which is the backlog the decision engine warns about from the other end
+           without ever knowing how big it was. -->
+      <div class="sec">${cancelled ? "Boarding when cancelled" : "Boarding curve"}</div>
+      ${cancelled ? spillNote(s) : ""}
+      ${curveSVG(s)}
       <div class="sec">What the app receives for this sailing</div>
       ${f
         ? `<pre class="json">${esc(JSON.stringify(f, null, 2))}</pre>`
