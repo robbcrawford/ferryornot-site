@@ -61,3 +61,17 @@ code.secret{display:block;word-break:break-all;font-size:12px;color:var(--muted)
 .tile p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
 .tile .meta{margin-top:12px;font-size:12px;color:var(--muted);
   font-variant-numeric:tabular-nums}
+
+
+/* Health strip on /development. Colour is a secondary cue only — every state also says
+   what it is in words, so it survives being read in greyscale or by someone colourblind. */
+.health { display: grid; gap: 8px; margin: 0 0 22px;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.health-item { border: 1px solid rgba(0,0,0,.12); border-left-width: 4px;
+               border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+.health-item b { display: block; font-size: 12px; letter-spacing: .04em;
+                 text-transform: uppercase; opacity: .65; margin-bottom: 2px; }
+.health-item.good { border-left-color: #2e7d32; }
+.health-item.warn { border-left-color: #b8860b; }
+.health-item.bad  { border-left-color: #c62828; background: rgba(198,40,40,.05); }
+.health-item.bad span { font-weight: 600; color: #c62828; }

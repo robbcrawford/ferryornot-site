@@ -26,6 +26,15 @@
   <p class="sub">Internal tools. Not linked from the public site, and each one requires
      this sign-in.</p>
 
+  <!-- Health strip. Deliberately ABOVE the tiles: if a WSDOT key is throttled or revoked,
+       that is the first thing worth knowing on this page, and burying it under three links
+       to tools would defeat the point of having it. -->
+  <div class="health" id="health" hidden>
+    <div class="health-item" id="h-key-app">    <b>App WSDOT key</b><span>—</span></div>
+    <div class="health-item" id="h-key-backend"><b>Backend WSDOT key</b><span>—</span></div>
+    <div class="health-item" id="h-feed">       <b>Rider feed</b><span>—</span></div>
+  </div>
+
   <div class="tiles">
     <a class="tile" href="/development/track/">
       <h2>Vessel Tracker</h2>
@@ -70,6 +79,51 @@ try {
 } catch (e) {
   $("m-schedule").textContent = "backend unreachable";
 }
+// ---- WSDOT key + feed health -------------------------------------------------
+// ⚠️ Every failure path below renders something explicit. A blank or missing health strip
+// is indistinguishable from "all fine", which is exactly the failure this whole monitor
+// exists to prevent — so unreachable, not-yet-probed and unhealthy each say so in words.
+function setHealth(el, label, state, detail) {
+  const node = document.getElementById(el);
+  node.className = "health-item " + state;
+  node.innerHTML = `<b>${label}</b><span>${detail}</span>`;
+}
+try {
+  const h = await authedFetch("https://fhodvdsrlbahtxsgptky.functions.supabase.co/keyhealth");
+  document.getElementById("health").hidden = false;
+
+  if (h.notWatching) {
+    // The probe itself has not run. Loudest state on the page, because it is the one where
+    // everything else here is silently meaningless.
+    setHealth("h-key-app", "App WSDOT key", "bad", "NOT BEING WATCHED — keycheck has not run in 24h");
+    setHealth("h-key-backend", "Backend WSDOT key", "bad", "NOT BEING WATCHED");
+  } else {
+    for (const k of h.keys) {
+      const id = k.key_label === "app" ? "h-key-app" : "h-key-backend";
+      const label = k.key_label === "app" ? "App WSDOT key" : "Backend WSDOT key";
+      const age = Math.round((Date.now() - new Date(k.last_checked)) / 60000);
+      if (k.healthy) {
+        setHealth(id, label, "good",
+          `OK · ${k.pct_ok}% of ${k.probes} probes in 24h · ${k.median_ms}ms · checked ${age}m ago`);
+      } else {
+        setHealth(id, label, "bad",
+          `${String(k.last_verdict).toUpperCase()} · ${k.consecutive_failures} consecutive failures · checked ${age}m ago`);
+      }
+    }
+  }
+
+  const f = h.feed;
+  if (!f || !f.probes) {
+    setHealth("h-feed", "Rider feed", "bad", "no probes recorded in 24h — the check itself is not running");
+  } else {
+    setHealth("h-feed", "Rider feed", f.failures > 0 ? "warn" : "good",
+      `${f.pct_ok}% up · ${f.failures} of ${f.probes} probes failed in 24h`);
+  }
+} catch (e) {
+  document.getElementById("health").hidden = false;
+  setHealth("h-key-app", "Health", "bad", "backend unreachable — status unknown");
+}
+
 try {
   const b = await authedFetch("https://fhodvdsrlbahtxsgptky.functions.supabase.co/buildprogress");
   const items = b.items || [];
