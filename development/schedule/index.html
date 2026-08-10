@@ -416,7 +416,7 @@ function sailClass(s){
   // and this timeline drew it as an ordinary pending chip labelled "overdue" — telling
   // a reader to keep waiting for a boat WSF had cancelled. Overdue and cancelled are
   // opposite news, and this test has to come first because a cancelled sailing is ALSO
-  // pending (no actual) and its `basis` still carries the OVERDUE marker.
+  // pending (no actual) and is ALSO flagged `appearsNotToHaveRun`.
   if (isCancelled(s)) return "cancelled";
   if (!s.actual) return "pending";
   if (s.delay == null) return "";
@@ -713,19 +713,23 @@ function curveSVG(s){
   </svg>`;
 }
 
+// ⚠️ THE TRAIL IS THE CASCADE'S HISTORY, not the app's. It reads `sailing_predictions`,
+// which the demoted cascade still writes — so this table shows what a model we no longer
+// serve thought, over time. Kept because "what did we predict, and when did we change our
+// mind" has forensic value that nothing else records; the Depth and Conf columns are gone
+// because they were the cascade's vocabulary and nothing else on this page speaks it.
+// If the cascade is ever switched off, this table goes with it.
 function trailTable(s){
   if (!s.trail || !s.trail.length)
     return '<div class="empty">No prediction trail — this sailing departed before ' +
            'prediction history was recorded, or its prediction never changed.</div>';
   return `<table class="trail"><thead><tr>
-      <th>Made at</th><th>Lead</th><th>Predicted</th><th>Depth</th><th>Conf</th><th>Basis</th>
+      <th>Made at</th><th>Lead</th><th>Predicted</th><th>Basis</th>
     </tr></thead><tbody>` +
     s.trail.map(r => `<tr>
       <td>${pacTime(r.at)}</td>
       <td class="muted">${r.lead == null ? "—" : (r.lead >= 0 ? "T−"+r.lead+"m" : "T+"+(-r.lead)+"m")}</td>
       <td>${pacTime(r.depart)}</td>
-      <td class="muted">${r.depth ?? "—"}</td>
-      <td class="muted">${r.conf ?? "—"}</td>
       <td class="muted">${r.basis ?? "—"}</td>
     </tr>`).join("") + `</tbody></table>`;
 }
@@ -744,9 +748,14 @@ function sailingHTML(s, showDir){
   // measured against, and the delay. Anything taller and chips collide at real ferry
   // headways — measured before this change, 9 of 20 consecutive pairs overlapped.
   const cancelled = isCancelled(s);
-  // A cancelled sailing is still `pending` and still carries an OVERDUE basis, so this
-  // has to be guarded rather than tested independently.
-  const overdue = !cancelled && (s.basis || "").includes("OVERDUE");
+  // ⚠️ WAS `(s.basis || "").includes("OVERDUE")` AND THAT SILENTLY STOPPED WORKING.
+  // `basis` used to be the cascade's own string, which carried an OVERDUE marker. Since
+  // the inspector was repointed at the app's prediction it reads observed | persistence |
+  // schedule, none of which contain "OVERDUE" — so every overdue sailing rendered as an
+  // ordinary pending chip and nothing errored. The backend now serves the fact directly.
+  // A cancelled sailing is still `pending` and still flagged, so this stays guarded
+  // rather than tested independently.
+  const overdue = !cancelled && s.appearsNotToHaveRun === true;
   const lead = cancelled ? pacTime(s.predicted || s.sched)
              : s.actual ? pacTime(s.actual)
              : overdue ? "overdue"
@@ -784,9 +793,11 @@ function sailingHTML(s, showDir){
               ? (s.driveUpTotal - (s.driveUpRemaining ?? 0)) + " / " + s.driveUpTotal : "—"}</div>
         <div><span>terminal wait</span>${s.waitHours == null ? "unknown"
               : (s.waitHours === 0 ? "no extended wait" : s.waitHours + "h")}</div>
-        <div><span>confidence</span>${s.confidence || "—"}${
-              s.depth != null ? ` <span class="muted">(depth ${s.depth})</span>` : ""}</div>
-        <div><span>basis</span>${s.basis || "—"}</div>
+        <div><span>basis</span>${s.basis || "—"}${
+              s.usable === false ? ' <span class="muted">(not usable — showing schedule)</span>' : ""}</div>
+        <div><span>carried delay</span>${s.carried == null ? "—" : s.carried + "m" + (
+              s.anchorVessel ? ` <span class="muted">from ${esc(s.anchorVessel)}` + (
+                s.anchorAge != null ? `, ${s.anchorAge}m old` : "") + "</span>" : "")}</div>
         <div><span>inbound leg</span>${s.inbound || "—"}</div>
         <div><span>opened / sold out</span>${pacTime(s.firstSale)} / ${
               s.soldOut ? pacTime(s.soldOut) : "—"}</div>
@@ -1010,7 +1021,9 @@ function render(payload){
 //
 // Two payloads, fetched separately and joined here:
 //
-//   schedule_live()  (authenticated)  everything we know: the cascade, the challenger
+//   schedule_live()  (authenticated)  everything we know, now including the same
+//                                     prediction the app serves (one derivation,
+//                                     `sailing_predicted_departure`, three surfaces)
 //                                     band, occupancy, the named vessel, cancellations
 //   /predictions     (public, no auth) the rider's feed, byte-for-byte
 //
