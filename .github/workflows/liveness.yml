@@ -1,0 +1,88 @@
+# FerryOrNot external liveness probe (backend board #111).
+#
+# WHY THIS LIVES HERE, OUTSIDE THE BACKEND: every watcher inside the Supabase
+# project (feedcheck, keycheck, the daily digest) hangs off the same pg_cron
+# scheduler as the things it watches. If that scheduler stops, the watchers stop
+# WITH the patient and no alert ever fires — the one failure the in-project
+# alerting can structurally never report. This probe runs on GitHub's
+# infrastructure and checks the two public, unauthenticated endpoints:
+#
+#   /predictions — the rider feed answers and carries sailings (project alive)
+#   /track       — the newest vessel position is recent (the 1-min collector,
+#                  and therefore pg_cron itself, is actually running)
+#
+# ALERTING: a failed scheduled run emails the workflow author via GitHub's
+# default Actions notifications — no keys, no services, nothing to expire.
+# Each check retries once after 60 s so a transient runner blip can't page.
+#
+# This repo is public, so scheduled Actions minutes are free; in the private
+# app repo the same cadence would eat most of the free tier .
+#
+# Run it by hand from the Actions tab (workflow_dispatch); set simulate=fail
+# to prove the alert channel end-to-end, exactly like feedcheck's ?simulate=fail.
+
+name: Backend liveness
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # best-effort; GitHub may delay a few minutes
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: "Set to 'fail' to force a failure and prove the alert email arrives"
+        required: false
+        default: ""
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe rider feed and collector freshness
+        env:
+          SIMULATE: ${{ inputs.simulate }}
+        run: |
+          set -u
+          BASE="https://fhodvdsrlbahtxsgptky.functions.supabase.co"
+
+          if [ "${SIMULATE:-}" = "fail" ]; then
+            echo "::error::Simulated failure requested — this proves the alert channel, ignore it."
+            exit 1
+          fi
+
+          check() {
+            # 1. The rider feed answers and carries sailings. A 200 with zero
+            #    sailings counts as down, same rule as feedcheck.
+            feed=$(curl -sS --max-time 20 "$BASE/predictions?horizon=360") || { echo "predictions: fetch failed"; return 1; }
+            n=$(echo "$feed" | jq -r '.sailings | length' 2>/dev/null) || { echo "predictions: not JSON"; return 1; }
+            [ "${n:-0}" -gt 0 ] || { echo "predictions: 0 sailings"; return 1; }
+            echo "predictions: OK ($n sailings)"
+
+            # 2. Collector freshness, via the public track feed: the newest
+            #    position's minute-offset vs the current Pacific minute. Only
+            #    asserted during service hours (06:00–22:00 Pacific) — overnight
+            #    and just after the Pacific midnight rollover the day is thin.
+            hour=$(TZ=America/Los_Angeles date +%-H)
+            if [ "$hour" -ge 6 ] && [ "$hour" -lt 22 ]; then
+              today=$(TZ=America/Los_Angeles date +%F)
+              nowmin=$(( $(TZ=America/Los_Angeles date +%-H) * 60 + $(TZ=America/Los_Angeles date +%-M) ))
+              track=$(curl -sS --max-time 30 "$BASE/track?date=$today") || { echo "track: fetch failed"; return 1; }
+              latest=$(echo "$track" | jq -r '[.vessels[].p[-1][0]] | max' 2>/dev/null)
+              [ "$latest" != "null" ] && [ -n "${latest:-}" ] || { echo "track: no positions for $today"; return 1; }
+              lag=$(( nowmin - latest ))
+              echo "track: newest position ${lag} min old"
+              [ "$lag" -le 15 ] || { echo "track: collector looks STOPPED (${lag} min since last position)"; return 1; }
+            else
+              echo "track: outside service hours — freshness not asserted"
+            fi
+            return 0
+          }
+
+          if check; then exit 0; fi
+          echo "First attempt failed — retrying in 60s (one transient blip must not page)"
+          sleep 60
+          if check; then exit 0; fi
+          echo "::error::FerryOrNot backend liveness FAILED twice. If /predictions is down or the collector is stale, the in-project watchers (feedcheck/keycheck/digest) may be down WITH it — check pg_cron first: supabase db query 'select * from cron.job_run_details order by start_time desc limit 20' --workdir backend"
+          exit 1
