@@ -13,6 +13,8 @@
 <link rel="icon" href="/app-icon.png">
 <link rel="apple-touch-icon" href="/app-icon.png">
 <link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/assets/vendor/maplibre-gl.css">
+<link rel="preload" as="fetch" href="/assets/map/routes.json" crossorigin>
 </head>
 <body>
 
@@ -74,7 +76,7 @@
         <i class="drive" style="--w:26%;flex-basis:26%"></i><i class="wait" style="--w:11%;flex-basis:11%"></i><i class="sail" style="--w:51%;flex-basis:51%"></i><i class="drive" style="--w:12%;flex-basis:12%"></i>
       </div>
       <div class="jl" data-step="5"><span><b class="tn">17m</b>DRIVE</span><span><b class="tn">7m</b>WAIT</span><span><b class="tn">33m</b>SAILING</span><span><b class="tn">8m</b>DRIVE</span></div>
-      <p class="fare" data-step="6">$27 fare · fuel needs your vehicle ›</p>
+      <p class="fare" data-step="6">≈$28 ($27 fare + $0.54 fuel) ›</p>
     </div>
     <p class="cap small">A real Thursday, September 2026. The app recomputes every minute.</p>
   </div>
@@ -91,6 +93,8 @@
     </div>
     <div>
       <div class="chart" id="chart">
+        <div class="mapwrap" id="mapwrap" aria-label="Map of central Puget Sound: the ferry crossing from Bainbridge Island to Seattle, and the drive around by the Tacoma Narrows" role="img"></div>
+        <div class="chart-fallback" id="chart-fallback">
         <svg viewBox="0 0 600 440" role="img" aria-label="A chart-style diagram: the ferry crossing from Bainbridge to Seattle is short; the drive around by the Tacoma Narrows is a long loop south.">
           <defs>
             <pattern id="soundings" width="18" height="12" patternUnits="userSpaceOnUse"><path class="sound" d="M0 6h18"/></pattern>
@@ -119,10 +123,11 @@
           <text class="lbl dim" x="222" y="414">NARROWS</text>
           <text class="lbl b" x="298" y="138">33 min on the water</text>
           <text class="lbl" x="445" y="388">1 HR 49 M</text>
-          <text class="lbl dim" x="445" y="402">AROUND BY THE NARROWS</text>
+          <text class="lbl dim" x="445" y="402">DRIVING AROUND</text>
         </svg>
+        </div>
       </div>
-      <p class="small" style="margin-top:10px;text-align:center">Schematic, not to scale. Times from the same Thursday as the card above.</p>
+      <p class="small mapcap" style="margin-top:10px;text-align:center">Real roads, real water. Times from the same Thursday as the card above. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, via Protomaps, served from this site.</p>
     </div>
   </div>
 </section>
@@ -136,22 +141,30 @@
 
     <div class="compare" id="compare">
       <div class="chips" id="chips" role="group" aria-label="Departure mode" hidden></div>
-      <p class="verdictline" id="verdictline">Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.</p>
-      <div class="opt">
-        <div class="name">Ferry<small id="ferry-sub">1 HR 6 M · DOOR TO DOOR</small><span class="flag" id="flag">SOONER BY 43 MIN</span></div>
+      <div class="cmpgrid">
         <div>
-          <div class="jbar" id="bar-ferry" aria-hidden="true"><i class="drive" style="flex-basis:15.6%"></i><i class="wait" style="flex-basis:6.4%"></i><i class="sail" style="flex-basis:30.3%"></i><i class="drive" style="flex-basis:7.3%"></i></div>
-          <div class="jl" id="legs-ferry"><span>17m drive</span><span>7m wait</span><span>33m sailing</span><span>8m drive</span></div>
+          <p class="verdictline" id="verdictline">Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.</p>
+          <div class="opt">
+            <div class="name">Ferry<small id="ferry-sub">1 HR 6 M · DOOR TO DOOR</small><span class="flag" id="flag">SOONER BY 43 MIN</span></div>
+            <div>
+              <div class="jbar" id="bar-ferry" aria-hidden="true"><i class="drive" style="flex-basis:15.6%"></i><i class="wait" style="flex-basis:6.4%"></i><i class="sail" style="flex-basis:30.3%"></i><i class="drive" style="flex-basis:7.3%"></i></div>
+              <div class="jl" id="legs-ferry"><span>17m drive</span><span>7m wait</span><span>33m sailing</span><span>8m drive</span></div>
+            </div>
+          </div>
+          <div class="opt">
+            <div class="name">Drive around<small id="drive-sub">1 HR 49 M · BY THE NARROWS</small><span class="flag" id="dflag" hidden></span></div>
+            <div>
+              <div class="jbar" id="bar-drive" aria-hidden="true"><i class="road" style="flex-basis:100%"></i></div>
+              <div class="jl"><span id="drive-legs">109m driving · live traffic</span></div>
+            </div>
+          </div>
+          <p class="small" style="margin-top:16px">Real readings from the app: a Thursday afternoon and a Monday night, September 2026. The live app recomputes every minute.</p>
         </div>
+        <figure class="shotcol">
+          <div class="minibezel"><img id="decide-shot" src="/assets/decide-now.webp" alt="The Decision screen: Take the 1:15 PM ferry, 43 min sooner than driving around" width="640" height="1391" loading="lazy"></div>
+          <figcaption class="small" id="decide-cap">Thursday 12:50 PM · Bainbridge → Seattle</figcaption>
+        </figure>
       </div>
-      <div class="opt">
-        <div class="name">Drive around<small id="drive-sub">1 HR 49 M · BY THE NARROWS</small></div>
-        <div>
-          <div class="jbar" id="bar-drive" aria-hidden="true"><i class="road" style="flex-basis:100%"></i></div>
-          <div class="jl"><span id="drive-legs">109m driving · live traffic</span></div>
-        </div>
-      </div>
-      <p class="small" style="margin-top:16px">Readings from a real Thursday, September 2026. The live app recomputes every minute.</p>
     </div>
 
     <div class="modes">
@@ -185,12 +198,13 @@
       <details class="pill">
         <summary>What was checked</summary>
         <div class="body">
-          <div><b>Bainbridge</b><span class="ok">Recommended · the 1:15 PM</span></div>
-          <div><b>Drive around</b><span>Also possible · 1 hr 49 m</span></div>
-          <div><b>Bremerton</b><span class="no">Not on offer · full for drive-up · the 11:25 would have made 12:10</span></div>
+          <div><b>Bainbridge – Colman Dock</b><span class="ok">Recommended · the 12:55 AM · leave 12:46 AM</span></div>
+          <div><b>Drive around</b><span>Also possible · leave 12:26 AM · live traffic</span></div>
+          <div><b>Bremerton – Colman Dock</b><span class="no">Not on offer · 30 mi of road to cover 7 mi</span></div>
+          <div><b>Southworth – Fauntleroy</b><span class="no">Not on offer · 44 mi of road to cover 9 mi</span></div>
         </div>
       </details>
-      <p class="small" style="margin-top:12px">Every crossing the engine looked at, and the drive, each with its outcome and a one-clause reason. The boat you expected can never vanish into a fold.</p>
+      <p class="small" style="margin-top:12px">Every crossing the engine looked at, and the drive, each with its outcome and a one-clause reason. A real check from a Monday night. The boat you expected can never vanish into a fold.</p>
     </div>
   </div>
 </section>
@@ -261,11 +275,11 @@
 <!-- 06 · THEN YOU'RE GOING -->
 <section class="stop night" id="going">
   <div class="wrap">
-    <span class="eyebrow">Then you're going</span>
-    <h2>Say "I'm going." The app takes the watch.</h2>
-    <p class="lede">Choosing a boat <strong>is</strong> committing. From that moment the journey is watched until you board, and the Lock Screen carries it.</p>
-
     <div class="watch">
+      <div>
+        <span class="eyebrow">Then you're going</span>
+        <h2>Say "I'm going." The app takes the watch.</h2>
+        <p class="lede">Choosing a boat <strong>is</strong> committing. From that moment the journey is watched until you board, and the Lock Screen carries it.</p>
       <div class="steps" id="steps">
         <div class="step on" data-state="1">
           <h3>Leave-by, held by the system</h3>
@@ -284,26 +298,17 @@
           <p>The watch ends itself when the boat departs. Nothing runs on the far side, and nothing runs between trips.</p>
         </div>
       </div>
+      </div>
 
       <div class="phone-wrap">
-        <div class="phone" id="phone" aria-label="Lock Screen card, example states">
-          <div class="clock"><small>Thu Sep 17</small><b class="tn" id="clock">12:49</b></div>
-          <div class="la" id="la" data-state="1">
-            <div class="top" data-for="1 2 3"><span>⛴ BAINBRIDGE — SEATTLE</span><span class="pills"><span class="pill cars">⛟ 157</span><span class="pill">On time</span></span></div>
-            <div class="lab" data-for="1 2"><span>STATUS</span><span>SAILING</span></div>
-            <div class="main" data-for="1 2"><span class="go" id="la-status">Leave by 12:53 PM</span><span>1:15 PM</span></div>
-            <div class="booth" data-for="3">
-              <div><div class="lab" style="margin:0 0 6px">AT THE BOOTH</div><div class="big">Scan to board</div><div class="sub">Vehicle under 22′ · 12 rides left</div></div>
-              <div class="plate"><img src="/assets/qr-appstore.svg" alt="Boarding pass QR (a rehearsal code that links to the App Store listing)" width="84" height="84"></div>
-            </div>
-            <div class="jbar" data-for="1 2 3" aria-hidden="true"><i class="drive" style="flex-basis:26%"></i><i class="wait" style="flex-basis:11%"></i><i class="sail" style="flex-basis:51%"></i><i class="drive" style="flex-basis:12%"></i></div>
-            <div class="foot" data-for="1 2 3"><span><b class="tn" id="la-count">25:––</b> to the 1:15 PM</span><span class="ves" id="la-ves">Tacoma inbound · docks 12:58 PM</span></div>
-          </div>
-          <div class="ended">The card ended itself when the 1:15 PM sailed.</div>
+        <div class="phone" id="phone" data-state="1" aria-label="Lock Screen card, real captures on one sailing">
+          <img data-for="1 2" src="/assets/la-leaveby.webp" alt="Lock Screen at 11:38 PM with the FerryOrNot card: Bainbridge to Seattle, 197 cars, on time, leave by 12:46 AM for the 12:55 AM, 1 hour 12 minutes to go, Tacoma on an earlier run" width="640" height="1391" loading="lazy">
+          <img data-for="3" src="/assets/la-booth.webp" alt="Lock Screen booth card: Scan to board, vehicle under 22 feet, 12 rides left, the boarding QR at tollbooth size, 1 hour 10 minutes to the 12:55 AM" width="640" height="1391" loading="lazy">
+          <img data-for="4" src="/assets/la-departed.webp" alt="Lock Screen after departure: a small card reading Departed 12:55 AM, Bainbridge to Seattle" width="640" height="1391" loading="lazy">
         </div>
       </div>
     </div>
-    <p class="small" style="margin-top:34px;color:#9AA3B2">The pass QR shown here is a rehearsal code that links to the App Store listing. A real pass never appears on this site.</p>
+    <p class="small" style="margin-top:34px;color:#9AA3B2">One sailing, the 12:55 AM from Bainbridge, on a September night. The pass QR is a rehearsal code that links to the App Store listing; a real pass never appears on this site.</p>
   </div>
 </section>
 
@@ -323,9 +328,9 @@
       <figure class="shot"><div class="bezel"><img src="/assets/fleet.webp" alt="The fleet map with twenty-one boats and a time slider" loading="lazy" width="600" height="1304"></div><p><b>The fleet</b>Twenty-one boats on a map, with a slider that scrubs the whole day.</p></figure>
       <figure class="shot"><div class="bezel"><img src="/assets/cameras.webp" alt="WSDOT terminal cameras for Bainbridge, each stamped with its time" loading="lazy" width="600" height="1304"></div><p><b>Terminal cameras</b>WSDOT's holding-lane cameras, stamped with the minute they were taken.</p></figure>
       <figure class="shot"><div class="bezel"><img src="/assets/alerts.webp" alt="Two live WSF service bulletins" loading="lazy" width="600" height="1304"></div><p><b>Service alerts</b>WSF's bulletins, plus reduced-service cautions before specific cancellations post.</p></figure>
+      <figure class="shot"><div class="bezel"><img src="/assets/receipt.webp" alt="Trip cost receipt: vehicle and driver fare $27.00, fuel 3 miles at 29 mpg $0.54, no tolls, total about $28" loading="lazy" width="640" height="1391"></div><p><b>What the trip costs</b>WSDOT's fare for the direction you sail, fuel from your own vehicle's EPA record, tolls read off the route. Nothing guessed.</p></figure>
     </div>
     <div class="also">
-      <div><b>What the trip costs</b>WSDOT's posted fare for the direction you sail, fuel from your own vehicle's EPA record, and tolls read off the route. Nothing is guessed: a part that isn't known never prints as zero.</div>
       <div><b>With no signal <span class="off">OFFLINE</span></b>The whole app says so within a second, the timetable and your pass still work, and the Decision screen withholds a recommendation rather than invent a drive.</div>
     </div>
   </div>

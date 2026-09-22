@@ -3,9 +3,17 @@
   "configurations": [
     {
       "name": "site",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8788", "--directory", "/Users/robbcrawford/Desktop/Chowen Labs, LLC/Projects/ferryornot-site"],
-      "port": 8788
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server@14",
+        ".",
+        "-p",
+        "8787",
+        "-c-1",
+        "--silent"
+      ],
+      "port": 8787
     }
   ]
 }
