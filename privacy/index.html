@@ -2,46 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Privacy Policy — FerryOrNot</title>
 <meta name="description" content="How FerryOrNot handles your data. Built to work without collecting personal information.">
-<style>
-  :root{--parchment:#F6F1E6;--card:#FFFEF8;--ink:#1B2A41;--brass:#9C7A32;--hairline:#E1D6BC;--muted:#5b6472;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--parchment);color:var(--ink);
-    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  a{color:var(--brass);text-decoration:none} a:hover{text-decoration:underline}
-  .wrap{max-width:720px;margin:0 auto;padding:0 22px}
-  header{border-bottom:1px solid var(--hairline)}
-  nav{display:flex;gap:22px;align-items:center;padding:18px 0;font-size:15px}
-  nav .brand{margin-right:auto;display:flex;align-items:center;gap:10px;line-height:0}
-  nav .brand .mark{height:26px;width:26px;border-radius:22.4%;display:block}
-  nav .brand .wordmark img{height:24px;width:auto;display:block}
-  h1{font-family:Georgia,"Times New Roman",serif;font-size:30px;margin:40px 0 6px}
-  h2{font-family:Georgia,"Times New Roman",serif;font-size:20px;margin:32px 0 8px}
-  .eff{color:var(--muted);font-size:14px;margin:0 0 8px}
-  footer{border-top:1px solid var(--hairline);margin-top:48px;padding:26px 0 40px;color:var(--muted);font-size:13.5px}
-  @media (prefers-color-scheme:dark){
-    :root{--parchment:#12161F;--card:#1B2230;--ink:#F3EFE3;--brass:#D2AC55;--hairline:#2C333F;--muted:#9aa3b2}
-  }
-</style>
+<link rel="icon" href="/app-icon.png">
+<link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header><div class="wrap"><nav>
-  <a class="brand" href="/" aria-label="FerryOrNot home">
-    <img class="mark" src="/app-icon.png" alt="">
-    <span class="wordmark"><picture>
-      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
-      <img src="/wordmark-light.png" alt="FerryOrNot">
-    </picture></span>
-  </a>
-  <a href="/support">Support</a>
-  <a href="/">Home</a>
-</nav></div></header>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="FerryOrNot home">
+      <img class="mark" src="/app-icon.png" alt="" width="28" height="28">
+      <picture>
+        <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+        <img class="word" src="/wordmark-light.png" alt="FerryOrNot">
+      </picture>
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="/#decides">How it decides</a>
+      <a href="/#edge">The edge</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/support">Support</a>
+    </nav>
+    <a class="btn small" href="/#pricing">Get the app</a>
+  </div>
+</header>
 
-<main class="wrap">
+<main class="wrap prose">
   <h1>Privacy Policy</h1>
-  <p class="eff">Effective September 12, 2026</p>
+  <p class="updated">Effective September 12, 2026</p>
 
   <p>FerryOrNot is developed by Chowen Labs, LLC (“we,” “us”). We built FerryOrNot to be useful <em>without</em> collecting your personal information. There are no accounts and no sign-in, and we do not maintain a profile of you.</p>
 
@@ -91,9 +80,16 @@
   <p>Questions about privacy? Email <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a>.</p>
 </main>
 
-<footer><div class="wrap">
-  FerryOrNot is a product of Chowen Labs, LLC, Bainbridge Island, WA.<br>
-  © 2026 Chowen Labs, LLC · <a href="/">FerryOrNot</a> · <a href="/support">Support</a>
-</div></footer>
+<footer>
+  <div class="wrap cols">
+    <div>
+      <p class="disc">Ferry schedules, vessel status, and drive-up space are provided by WSDOT / Washington State Ferries; traffic from Apple Maps. Space counts are advisory estimates, not guarantees. <strong>FerryOrNot is not affiliated with or endorsed by Washington State Ferries or WSDOT.</strong></p>
+      <p style="margin-top:12px">FerryOrNot is a product of Chowen Labs, LLC, Bainbridge Island, WA. · <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a><br>© 2026 Chowen Labs, LLC</p>
+    </div>
+    <nav aria-label="Footer">
+      <a href="/#decides">How it decides</a><a href="/#edge">The edge</a><a href="/#pricing">Pricing</a><a href="/support">Support</a><a href="/privacy">Privacy Policy</a>
+    </nav>
+  </div>
+</footer>
 </body>
 </html>

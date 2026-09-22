@@ -4,7 +4,7 @@
     {
       "name": "site",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8788"],
+      "runtimeArgs": ["-m", "http.server", "8788", "--directory", "/Users/robbcrawford/Desktop/Chowen Labs, LLC/Projects/ferryornot-site"],
       "port": 8788
     }
   ]

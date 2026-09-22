@@ -1,85 +1,461 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-launch="pre">
+<!-- LAUNCH DAY (#37): change data-launch="pre" to data-launch="live" above and set APP_STORE_URL in site.js. Nothing else changes. -->
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FerryOrNot — Ferry or drive? Know before you go.</title>
-<meta name="description" content="FerryOrNot compares taking the ferry versus driving around, door to door, using live Washington State Ferries schedules and traffic.">
-<style>
-  :root{
-    --parchment:#F6F1E6; --card:#FFFEF8; --ink:#1B2A41; --brass:#9C7A32;
-    --hairline:#E1D6BC; --muted:#5b6472;
-  }
-  *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--parchment);color:var(--ink);
-    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  a{color:var(--brass);text-decoration:none}
-  a:hover{text-decoration:underline}
-  .wrap{max-width:720px;margin:0 auto;padding:0 22px}
-  header{border-bottom:1px solid var(--hairline)}
-  nav{display:flex;gap:22px;align-items:center;padding:18px 0;font-size:15px}
-  nav .brand{margin-right:auto;display:flex;align-items:center;gap:10px;line-height:0}
-  nav .brand .mark{height:26px;width:26px;border-radius:22.4%;display:block}
-  nav .brand .wordmark img{height:24px;width:auto;display:block}
-  .hero .appicon{width:88px;height:88px;border-radius:22.4%;display:block;margin:0 0 22px}
-  .hero{padding:56px 0 40px}
-  h1{font-family:Georgia,"Times New Roman",serif;font-size:34px;line-height:1.15;margin:0 0 14px}
-  h1 .or{color:var(--brass)}
-  .lede{font-size:19px;color:var(--muted);margin:0 0 28px}
-  .card{background:var(--card);border:1px solid var(--hairline);border-radius:16px;padding:22px 24px;margin:18px 0}
-  .btn{display:inline-block;background:var(--ink);color:var(--parchment)!important;padding:13px 22px;border-radius:12px;font-weight:600;text-decoration:none!important}
-  .btn:hover{opacity:.92}
-  ul.feat{list-style:none;padding:0;margin:8px 0 0}
-  ul.feat li{padding:9px 0;border-top:1px dashed var(--hairline)}
-  ul.feat li:first-child{border-top:0}
-  footer{border-top:1px solid var(--hairline);margin-top:48px;padding:26px 0 40px;color:var(--muted);font-size:13.5px}
-  .disclaimer{font-size:13px;color:var(--muted);margin-top:10px}
-  @media (prefers-color-scheme:dark){
-    :root{--parchment:#12161F;--card:#1B2230;--ink:#F3EFE3;--brass:#D2AC55;--hairline:#2C333F;--muted:#9aa3b2}
-    .btn{color:#12161F!important}
-  }
-</style>
+<meta name="description" content="FerryOrNot compares taking the Washington State Ferry against driving around, door to door, from where you are right now: live traffic, the boat you'd actually catch, the wait at the dock, and whether the drive-up deck will still have room.">
+<meta property="og:title" content="FerryOrNot — Ferry or drive? Know before you go.">
+<meta property="og:description" content="Door to door, both ways, every minute. The ferry-or-drive decision for Puget Sound, then a watch on your sailing until you board.">
+<meta property="og:image" content="https://ferryornot.app/app-icon.png">
+<meta property="og:url" content="https://ferryornot.app/">
+<link rel="icon" href="/app-icon.png">
+<link rel="apple-touch-icon" href="/app-icon.png">
+<link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header><div class="wrap"><nav>
-  <a class="brand" href="/" aria-label="FerryOrNot home">
-    <img class="mark" src="/app-icon.png" alt="">
-    <span class="wordmark"><picture>
-      <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
-      <img src="/wordmark-light.png" alt="FerryOrNot">
-    </picture></span>
-  </a>
-  <a href="/support">Support</a>
-  <a href="/privacy">Privacy</a>
-</nav></div></header>
 
-<main class="wrap">
-  <section class="hero">
-    <img class="appicon" src="/app-icon.png" alt="FerryOrNot app icon">
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="FerryOrNot home">
+      <img class="mark" src="/app-icon.png" alt="" width="28" height="28">
+      <picture>
+        <source srcset="/wordmark-dark.png" media="(prefers-color-scheme: dark)">
+        <img class="word" src="/wordmark-light.png" alt="FerryOrNot">
+      </picture>
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="#decides">How it decides</a>
+      <a href="#edge">The edge</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/support">Support</a>
+    </nav>
+    <a class="btn small" data-cta="nav" href="#pricing">Download</a>
+  </div>
+  <div class="prog" aria-hidden="true">
+    <div class="track"><i class="seg-drive" style="width:16%"></i><i class="seg-wait" style="width:7%"></i><i class="seg-sail" style="width:60%"></i><i class="seg-drive" style="width:17%"></i></div>
+    <div class="fill"><i class="seg-drive" style="width:16%"></i><i class="seg-wait" style="width:7%"></i><i class="seg-sail" style="width:60%"></i><i class="seg-drive" style="width:17%"></i></div>
+  </div>
+</header>
+
+<main>
+
+<!-- 01 · HERO -->
+<section class="wrap hero" id="top">
+  <div>
+    <span class="eyebrow" data-eyebrow>Now in App Review</span>
     <h1>Ferry <span class="or">or</span> drive?<br>Know before you go.</h1>
-    <p class="lede">FerryOrNot compares taking the ferry against driving around — door to door — using live Washington State Ferries schedules, delays, and traffic. So you catch the boat, or beat it.</p>
-    <!-- LAUNCH DAY: replace this TestFlight link with the App Store link and the label "Download on the App Store". -->
-    <a class="btn" href="https://testflight.apple.com/join/j1xDe64e">Join the TestFlight beta</a>
-  </section>
+    <p class="lede">FerryOrNot compares the ferry against driving around, <strong>door to door, from where you are right now</strong>: live traffic, the boat you'd actually catch, the wait at the dock, and whether the drive-up deck will still have room when you get there.</p>
+    <div class="cta">
+      <a class="btn" id="hero-cta" data-cta="hero" href="#pricing">Download on the App Store</a>
+      <a class="textlink" href="#decides">See how it decides ↓</a>
+    </div>
+    <p class="small">Ten Washington State Ferries crossings across Puget Sound. Independent, not affiliated with WSF or WSDOT.</p>
+  </div>
 
-  <section class="card">
-    <strong>What it does</strong>
-    <ul class="feat">
-      <li>Live ferry-vs-drive decisions, timed door to door</li>
-      <li>Real-time delays, cancellations &amp; drive-up space</li>
-      <li>Track your sailing on the Lock Screen</li>
-      <li>Leave-by reminders and saved commutes</li>
-    </ul>
-  </section>
+  <div class="stage">
+    <div class="vcard seq" id="vcard" aria-label="Example recommendation from the app">
+      <div class="od" data-step="1">
+        <span class="dot"></span><div><small>From</small><span>Bainbridge Island</span></div>
+        <span class="pin"></span><div><small>To</small><span>Seattle</span></div>
+      </div>
+      <p class="cmp" data-step="2"><span id="cmp-text">Leaving now either way, the ferry gets you there <b>43 min sooner</b> — driving around takes 1 hr 49 m.</span></p>
+      <div data-step="3">
+        <div class="route">⛴ BAINBRIDGE — COLMAN DOCK</div>
+        <div class="verdict">Take the <em>1:15 PM</em> ferry</div>
+      </div>
+      <div class="lb" data-step="4">
+        <div><small>LEAVE BY</small><b class="go">Now</b></div>
+        <span class="dur">1 HR 6 M</span>
+        <div style="text-align:right"><small>ARRIVES</small><b>1:56 PM</b></div>
+      </div>
+      <div class="jbar" data-bar aria-hidden="true">
+        <i class="drive" style="--w:26%;flex-basis:26%"></i><i class="wait" style="--w:11%;flex-basis:11%"></i><i class="sail" style="--w:51%;flex-basis:51%"></i><i class="drive" style="--w:12%;flex-basis:12%"></i>
+      </div>
+      <div class="jl" data-step="5"><span><b class="tn">17m</b>DRIVE</span><span><b class="tn">7m</b>WAIT</span><span><b class="tn">33m</b>SAILING</span><span><b class="tn">8m</b>DRIVE</span></div>
+      <p class="fare" data-step="6">$27 fare · fuel needs your vehicle ›</p>
+    </div>
+    <p class="cap small">A real Thursday, September 2026. The app recomputes every minute.</p>
+  </div>
+</section>
 
-  <p class="disclaimer">Ferry schedules, vessel status, and drive-up space are provided by WSDOT / Washington State Ferries; traffic from Apple Maps. Space counts are advisory estimates, not guarantees. FerryOrNot is an independent app and is not affiliated with or endorsed by Washington State Ferries or WSDOT.</p>
+<!-- 02 · THE BET -->
+<section class="stop" id="bet">
+  <div class="wrap bet">
+    <div class="copy">
+      <span class="eyebrow">The question</span>
+      <h2 style="margin-top:14px">Every trip across the Sound is a bet.</h2>
+      <p class="lede">Bainbridge to Seattle is 33 minutes on the water or an hour and forty-nine around. Which one wins changes by the minute: I-5, a late boat, a cancelled sailing, and how many cars are already in the holding lanes.</p>
+      <p class="lede">WSF's own app shows the schedule and a space number. It can't tell you which way to go, leaving now, from here.</p>
+    </div>
+    <div>
+      <div class="chart" id="chart">
+        <svg viewBox="0 0 600 440" role="img" aria-label="A chart-style diagram: the ferry crossing from Bainbridge to Seattle is short; the drive around by the Tacoma Narrows is a long loop south.">
+          <defs>
+            <pattern id="soundings" width="18" height="12" patternUnits="userSpaceOnUse"><path class="sound" d="M0 6h18"/></pattern>
+          </defs>
+          <rect width="600" height="440" fill="url(#soundings)"/>
+          <!-- Kitsap peninsula -->
+          <path class="land" d="M0 0 H150 C165 40 130 75 152 105 C172 145 140 200 160 250 C176 300 150 340 190 380 C215 402 250 410 250 440 H0 Z"/>
+          <!-- mainland: Seattle to Tacoma -->
+          <path class="land" d="M600 0 H420 C408 60 432 120 416 180 C402 240 430 300 412 350 C398 390 340 400 300 440 H600 Z"/>
+          <!-- Bainbridge Island -->
+          <path class="land" d="M232 68 C272 74 298 110 290 152 C283 200 262 236 236 242 C206 247 190 212 195 170 C198 130 200 78 232 68 Z"/>
+          <!-- Vashon -->
+          <path class="land" d="M320 262 C348 262 358 300 350 340 C342 372 326 386 316 370 C304 344 300 300 320 262 Z"/>
+          <!-- the Narrows bridge -->
+          <path d="M250 424 H300" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <!-- routes -->
+          <path class="drive" pathLength="1000" d="M284 162 C255 150 225 120 206 86 C190 82 172 88 160 96 C142 130 138 200 152 250 C165 300 172 340 200 380 C215 402 232 416 250 424 H300 C325 415 345 400 360 380 C385 340 405 300 414 250 C418 215 412 195 410 180"/>
+          <path class="boat" pathLength="1000" d="M284 162 C330 150 372 160 410 178"/>
+          <circle cx="284" cy="162" r="5" fill="var(--ink)"/>
+          <circle cx="410" cy="178" r="5" fill="var(--red)"/>
+          <!-- labels -->
+          <text class="lbl" x="204" y="160">BAINBRIDGE</text>
+          <text class="lbl" x="470" y="182">SEATTLE</text>
+          <text class="lbl" x="30" y="230">KITSAP</text>
+          <text class="lbl dim" x="311" y="330">VASHON</text>
+          <text class="lbl dim" x="222" y="414">NARROWS</text>
+          <text class="lbl b" x="298" y="138">33 min on the water</text>
+          <text class="lbl" x="445" y="388">1 HR 49 M</text>
+          <text class="lbl dim" x="445" y="402">AROUND BY THE NARROWS</text>
+        </svg>
+      </div>
+      <p class="small" style="margin-top:10px;text-align:center">Schematic, not to scale. Times from the same Thursday as the card above.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 03 · HOW IT DECIDES -->
+<section class="stop" id="decides">
+  <div class="wrap">
+    <span class="eyebrow">How it decides</span>
+    <h2>Door to door, both ways, every minute.</h2>
+    <p class="lede">The ferry option is four legs: the drive to the dock, the wait in line, the crossing, and the drive on the far side. The drive-around is one long leg with live traffic. The app times both from where you are and recommends one, with the confidence it has actually earned.</p>
+
+    <div class="compare" id="compare">
+      <div class="chips" id="chips" role="group" aria-label="Departure mode" hidden></div>
+      <p class="verdictline" id="verdictline">Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.</p>
+      <div class="opt">
+        <div class="name">Ferry<small id="ferry-sub">1 HR 6 M · DOOR TO DOOR</small><span class="flag" id="flag">SOONER BY 43 MIN</span></div>
+        <div>
+          <div class="jbar" id="bar-ferry" aria-hidden="true"><i class="drive" style="flex-basis:15.6%"></i><i class="wait" style="flex-basis:6.4%"></i><i class="sail" style="flex-basis:30.3%"></i><i class="drive" style="flex-basis:7.3%"></i></div>
+          <div class="jl" id="legs-ferry"><span>17m drive</span><span>7m wait</span><span>33m sailing</span><span>8m drive</span></div>
+        </div>
+      </div>
+      <div class="opt">
+        <div class="name">Drive around<small id="drive-sub">1 HR 49 M · BY THE NARROWS</small></div>
+        <div>
+          <div class="jbar" id="bar-drive" aria-hidden="true"><i class="road" style="flex-basis:100%"></i></div>
+          <div class="jl"><span id="drive-legs">109m driving · live traffic</span></div>
+        </div>
+      </div>
+      <p class="small" style="margin-top:16px">Readings from a real Thursday, September 2026. The live app recomputes every minute.</p>
+    </div>
+
+    <div class="modes">
+      <div><b>Leave now</b><p>The default. Where you are, right now, both ways.</p></div>
+      <div><b>Leave at a time</b><p>Plan the 4:30 departure with the boats and traffic it will actually meet.</p></div>
+      <div><b>Arrive by a deadline</b><p>It works backwards: "leave by 3:40 to make it", and which boat that means.</p></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- 04 · IT SHOWS ITS WORK -->
+<section class="stop white" id="work">
+  <div class="wrap work">
+    <div>
+      <span class="eyebrow">Honest by design</span>
+      <h2 style="margin-top:14px">It shows its work.</h2>
+      <p class="lede">Every recommendation carries named checks, each individually answerable. The confidence you see is <strong>derived from them, never asserted separately</strong>. A check the app couldn't run says so, and never counts as passed.</p>
+    </div>
+    <div>
+      <div class="ledger" id="ledger" aria-label="Trip checks, example">
+        <div class="row"><i></i><span>Boat is running</span><span class="st">Passed</span></div>
+        <div class="row"><i></i><span>Your car can board</span><span class="st">Passed</span></div>
+        <div class="row"><i></i><span>Drive-up space</span><span class="st">Passed</span></div>
+        <div class="row"><i></i><span>You can make it</span><span class="st">Passed</span></div>
+        <div class="row"><i></i><span>Departure time</span><span class="st">Passed</span></div>
+        <div class="row na"><i></i><span>No backlog from cancellations</span><span class="st">Couldn't check</span></div>
+        <div class="row"><i></i><span>Live traffic</span><span class="st">Passed</span></div>
+      </div>
+      <details class="pill">
+        <summary>What was checked</summary>
+        <div class="body">
+          <div><b>Bainbridge</b><span class="ok">Recommended · the 1:15 PM</span></div>
+          <div><b>Drive around</b><span>Also possible · 1 hr 49 m</span></div>
+          <div><b>Bremerton</b><span class="no">Not on offer · full for drive-up · the 11:25 would have made 12:10</span></div>
+        </div>
+      </details>
+      <p class="small" style="margin-top:12px">Every crossing the engine looked at, and the drive, each with its outcome and a one-clause reason. The boat you expected can never vanish into a fold.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 05 · THE SIGN VS THE APP -->
+<section class="stop white" id="edge">
+  <div class="wrap">
+    <span class="eyebrow">The edge</span>
+    <h2>The sign at the dock isn't the whole story.</h2>
+    <p class="lede">WSF's drive-up number counts cars scanned at the booth against a schedule slot. It is not the deck. Our backend has watched every sailing on ten crossings, every minute, since summer 2026. Three things it found:</p>
+
+    <div class="exhibits">
+      <article class="ex">
+        <span class="eyebrow">A · The cars the sign doesn't count</span>
+        <svg viewBox="0 0 220 84" aria-hidden="true">
+          <rect x="4" y="30" width="18" height="26" rx="2" fill="var(--brass)"/><text x="2" y="72" fill="var(--muted)">BOOTH</text>
+          <g fill="var(--ink)"><rect x="40" y="36" width="16" height="14" rx="2"/><rect x="60" y="36" width="16" height="14" rx="2"/><rect x="80" y="36" width="16" height="14" rx="2"/><rect x="100" y="36" width="16" height="14" rx="2"/></g>
+          <text x="40" y="72" fill="var(--muted)">THIS SAILING · 37%</text>
+          <line x1="128" y1="26" x2="128" y2="60" stroke="var(--hair)"/>
+          <g fill="none" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="3 2"><rect x="140" y="36" width="16" height="14" rx="2"/><rect x="160" y="36" width="16" height="14" rx="2"/><rect x="180" y="36" width="16" height="14" rx="2"/><rect x="200" y="36" width="16" height="14" rx="2"/></g>
+          <text x="140" y="72" fill="var(--red)">NOT COUNTED</text>
+        </svg>
+        <p class="fig">Published 37% full. <span>Actually over capacity.</span></p>
+        <p>When a boat fills or is cancelled, the cars already through the booth spill onto the next sailing, and the sign's number for that sailing doesn't include them. The app simulates the queue in physical order and says when the number on the sign is misleading.</p>
+      </article>
+
+      <article class="ex">
+        <span class="eyebrow">B · We kept counting</span>
+        <svg viewBox="0 0 220 84" aria-hidden="true">
+          <line x1="10" y1="64" x2="210" y2="64" stroke="var(--hair)"/>
+          <path d="M10 60 L60 46 L100 36 L210 36" fill="none" stroke="var(--water)" stroke-width="2.5"/>
+          <path d="M10 60 L60 46 L100 36 L140 22 L210 10" fill="none" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/>
+          <line x1="100" y1="6" x2="100" y2="68" stroke="var(--red)" stroke-dasharray="3 3"/>
+          <text x="104" y="80" fill="var(--red)">+5 MIN · SIGN FREEZES</text>
+          <text x="12" y="80" fill="var(--muted)">SCHEDULED</text>
+          <text x="150" y="48" fill="var(--muted)">THE SIGN</text>
+          <text x="160" y="20" fill="var(--brass)">THE APP</text>
+        </svg>
+        <p class="fig">The sign stops at +5. <span>The boat is still loading.</span></p>
+        <p>WSF stops updating a sailing's count five minutes after its scheduled time, even when the boat is late and still taking cars. The app's backend keeps counting and serves its own figure for exactly the window the sign goes dark.</p>
+      </article>
+
+      <article class="ex">
+        <span class="eyebrow">C · After a full boat</span>
+        <svg viewBox="0 0 220 84" aria-hidden="true">
+          <rect x="30" y="12" width="60" height="52" rx="3" fill="var(--red)"/>
+          <text x="40" y="44" fill="#fff" style="font-size:16px;font-weight:700">54%</text>
+          <rect x="130" y="56" width="60" height="8" rx="2" fill="var(--water)"/>
+          <text x="150" y="50" fill="var(--muted)" style="font-size:12px;font-weight:700">8%</text>
+          <text x="22" y="78" fill="var(--muted)">PREVIOUS SOLD OUT</text>
+          <text x="138" y="78" fill="var(--muted)">BASELINE</text>
+        </svg>
+        <p class="fig">The next one sells out <span>54% of the time.</span></p>
+        <p>If the previous sailing sold out, the next one sells out about 54% of the time even when its own number still looks roomy. The baseline is about 8%. The app warns; the sign can't.</p>
+      </article>
+    </div>
+
+    <div class="more">
+      <div><b>Delay forecasts only where they're proven.</b>Each boat's last observed delay is carried forward, gated per route by measured skill. On a typical day this month the forecast cut the timetable's error from about 8 minutes to 3.5. Where it can't beat the schedule, you see the schedule.</div>
+      <div><b>Cancellations the schedule feed hides.</b>WSF deletes cancelled sailings from its schedule feed rather than flagging them. The app reads the adjustment feed and its own captured baseline, so a cancelled boat is struck through instead of gone.</div>
+    </div>
+    <p class="small foot">Measured on FerryOrNot's own telemetry across 18 route directions, summer–fall 2026. Space counts are advisory estimates, not guarantees.</p>
+  </div>
+</section>
+
+<div class="dusk" aria-hidden="true"></div>
+
+<!-- 06 · THEN YOU'RE GOING -->
+<section class="stop night" id="going">
+  <div class="wrap">
+    <span class="eyebrow">Then you're going</span>
+    <h2>Say "I'm going." The app takes the watch.</h2>
+    <p class="lede">Choosing a boat <strong>is</strong> committing. From that moment the journey is watched until you board, and the Lock Screen carries it.</p>
+
+    <div class="watch">
+      <div class="steps" id="steps">
+        <div class="step on" data-state="1">
+          <h3>Leave-by, held by the system</h3>
+          <p>A reminder that fires to the minute even if the app was killed. The card goes on your Lock Screen the moment you commit, with the boat, the deck count, and the leave-by time.</p>
+        </div>
+        <div class="step" data-state="2">
+          <h3>On the road</h3>
+          <p>"You can't reach the dock in time" is computed from where you actually are, not where you started. When a warning stops being true, the card says so: <b>"your 7:05 works again."</b> If the boat fills before you'd board, you hear that too, and the next option that still works.</p>
+        </div>
+        <div class="step" data-state="3">
+          <h3>At the booth</h3>
+          <p>As you approach the terminal, the Lock Screen card becomes your boarding pass: the real scannable QR, at tollbooth size, on the locked phone. No unlock, no tap.</p>
+        </div>
+        <div class="step" data-state="4">
+          <h3>Aboard</h3>
+          <p>The watch ends itself when the boat departs. Nothing runs on the far side, and nothing runs between trips.</p>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone" id="phone" aria-label="Lock Screen card, example states">
+          <div class="clock"><small>Thu Sep 17</small><b class="tn" id="clock">12:49</b></div>
+          <div class="la" id="la" data-state="1">
+            <div class="top" data-for="1 2 3"><span>⛴ BAINBRIDGE — SEATTLE</span><span class="pills"><span class="pill cars">⛟ 157</span><span class="pill">On time</span></span></div>
+            <div class="lab" data-for="1 2"><span>STATUS</span><span>SAILING</span></div>
+            <div class="main" data-for="1 2"><span class="go" id="la-status">Leave by 12:53 PM</span><span>1:15 PM</span></div>
+            <div class="booth" data-for="3">
+              <div><div class="lab" style="margin:0 0 6px">AT THE BOOTH</div><div class="big">Scan to board</div><div class="sub">Vehicle under 22′ · 12 rides left</div></div>
+              <div class="plate"><img src="/assets/qr-appstore.svg" alt="Boarding pass QR (a rehearsal code that links to the App Store listing)" width="84" height="84"></div>
+            </div>
+            <div class="jbar" data-for="1 2 3" aria-hidden="true"><i class="drive" style="flex-basis:26%"></i><i class="wait" style="flex-basis:11%"></i><i class="sail" style="flex-basis:51%"></i><i class="drive" style="flex-basis:12%"></i></div>
+            <div class="foot" data-for="1 2 3"><span><b class="tn" id="la-count">25:––</b> to the 1:15 PM</span><span class="ves" id="la-ves">Tacoma inbound · docks 12:58 PM</span></div>
+          </div>
+          <div class="ended">The card ended itself when the 1:15 PM sailed.</div>
+        </div>
+      </div>
+    </div>
+    <p class="small" style="margin-top:34px;color:#9AA3B2">The pass QR shown here is a rehearsal code that links to the App Store listing. A real pass never appears on this site.</p>
+  </div>
+</section>
+
+<div class="dawn" aria-hidden="true"></div>
+
+<!-- 07 · EVERYTHING ELSE -->
+<section class="stop" id="everything" style="padding-top:40px">
+  <div class="wrap">
+    <span class="eyebrow">And the rest</span>
+    <h2>Everything a ferry app should have.</h2>
+    <p class="lede">So there's no reason to keep a second one installed.</p>
+  </div>
+  <div class="wrap">
+    <div class="gallery" id="gallery" tabindex="0" aria-label="Screens from the app">
+      <figure class="shot"><div class="bezel"><img src="/assets/day.webp" alt="The Ferries tab: a day of sailings with drive-up space pills on the right and a departed sailing marked left 3 min late" loading="lazy" width="600" height="1304"></div><p><b>The whole day</b>Every sailing on any crossing, with space on the right rail and late boats marked.</p></figure>
+      <figure class="shot"><div class="bezel"><img src="/assets/sailing.webp" alt="A sailing opened: the deck-fill curve against its history and a be-in-line-by time" loading="lazy" width="600" height="1304"></div><p><b>Open a sailing</b>Its deck-fill curve against its own history, and "be in line by".</p></figure>
+      <figure class="shot"><div class="bezel"><img src="/assets/fleet.webp" alt="The fleet map with twenty-one boats and a time slider" loading="lazy" width="600" height="1304"></div><p><b>The fleet</b>Twenty-one boats on a map, with a slider that scrubs the whole day.</p></figure>
+      <figure class="shot"><div class="bezel"><img src="/assets/cameras.webp" alt="WSDOT terminal cameras for Bainbridge, each stamped with its time" loading="lazy" width="600" height="1304"></div><p><b>Terminal cameras</b>WSDOT's holding-lane cameras, stamped with the minute they were taken.</p></figure>
+      <figure class="shot"><div class="bezel"><img src="/assets/alerts.webp" alt="Two live WSF service bulletins" loading="lazy" width="600" height="1304"></div><p><b>Service alerts</b>WSF's bulletins, plus reduced-service cautions before specific cancellations post.</p></figure>
+    </div>
+    <div class="also">
+      <div><b>What the trip costs</b>WSDOT's posted fare for the direction you sail, fuel from your own vehicle's EPA record, and tolls read off the route. Nothing is guessed: a part that isn't known never prints as zero.</div>
+      <div><b>With no signal <span class="off">OFFLINE</span></b>The whole app says so within a second, the timetable and your pass still work, and the Decision screen withholds a recommendation rather than invent a drive.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- 08 · WHERE IT WORKS -->
+<section class="stop" id="routes">
+  <div class="wrap">
+    <span class="eyebrow">Where it works</span>
+    <h2>Ten crossings.</h2>
+    <div class="routes">
+      <span class="route"><i></i>Seattle – Bainbridge</span>
+      <span class="route"><i></i>Seattle – Bremerton</span>
+      <span class="route"><i></i>Edmonds – Kingston</span>
+      <span class="route"><i></i>Mukilteo – Clinton</span>
+      <span class="route"><i></i>Fauntleroy – Vashon</span>
+      <span class="route"><i></i>Fauntleroy – Southworth</span>
+      <span class="route"><i></i>Southworth – Vashon</span>
+      <span class="route"><i></i>Point Defiance – Tahlequah</span>
+      <span class="route"><i></i>Port Townsend – Coupeville</span>
+      <span class="route"><i class="sched"></i>Anacortes – San Juan Islands</span>
+    </div>
+    <div class="legend"><span><i></i>Delay forecasts, where they've earned it</span><span><i class="sched"></i>Published schedule, and the app says so rather than guessing</span></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- 09 · PRIVACY -->
+<section class="stop" id="privacy">
+  <div class="wrap priv">
+    <div>
+      <span class="eyebrow">Privacy</span>
+      <h2 style="margin-top:14px">Nothing about you leaves your phone.</h2>
+      <p class="lede">The decision engine runs on the device. The backend only sends data down.</p>
+      <ul>
+        <li>It never learns where you are, where you're going, or which boat you care about.</li>
+        <li>No account. No analytics. No ads, ever.</li>
+        <li>App Privacy label: <b>Data Not Collected</b>.</li>
+        <li>This website makes no third-party requests either.</li>
+      </ul>
+    </div>
+    <svg viewBox="0 0 420 120" role="img" aria-label="Data flows one way: from WSF feeds to the FerryOrNot backend to your iPhone. Nothing goes back.">
+      <rect class="node" x="4" y="34" width="112" height="44" rx="8"/><text class="lbl" x="22" y="60">WSF FEEDS</text>
+      <rect class="node" x="154" y="34" width="112" height="44" rx="8"/><text class="lbl" x="165" y="60">OUR BACKEND</text>
+      <rect class="node" x="304" y="34" width="112" height="44" rx="8"/><text class="lbl" x="318" y="60">YOUR IPHONE</text>
+      <path class="arrow" d="M118 50 H148"/><path class="arrowhead" d="M146 44 l8 6 -8 6z"/>
+      <path class="arrow" d="M268 50 H298"/><path class="arrowhead" d="M296 44 l8 6 -8 6z"/>
+      <path class="none" d="M302 68 H270"/><path class="none" d="M152 68 H120"/>
+      <text class="nolbl" x="120" y="104">NOTHING GOES BACK · NOT EVEN WHICH BOAT</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- 10 · PRICING -->
+<section class="stop" id="pricing">
+  <div class="wrap price">
+    <div>
+      <span class="eyebrow">Pricing</span>
+      <h2 style="margin-top:14px">One subscription.<br>Seven days free.</h2>
+      <p class="lede">Everything above. No free tier, no ads, no upsells. Cancel in Settings any time.</p>
+      <p class="lede pre-only" style="margin-top:14px">TestFlight builds don't charge. The subscription begins with the App Store release.</p>
+    </div>
+    <div class="pcard">
+      <div class="seg" role="group" aria-label="Billing period">
+        <button type="button" id="seg-month" aria-pressed="true">Monthly</button>
+        <button type="button" id="seg-year" aria-pressed="false">Yearly</button>
+      </div>
+      <div>
+        <div class="amount tn" id="amount">$1.49<small>/ month</small></div>
+        <p class="per" id="per">About 5¢ a day.</p>
+      </div>
+      <span class="trial">● 7-day free trial</span>
+      <p class="anchor" id="anchor">Less than six percent of one car fare a month.</p>
+      <div class="go">
+        <a class="btn" data-cta="pricing" href="#">Download on the App Store</a>
+        <div class="qr"><img id="qr" src="/assets/qr-testflight.svg" alt="" width="78" height="78"><span>On a desktop? Scan to install.</span></div>
+      </div>
+      <p class="legal">Payment is charged to your Apple Account. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings → your name → Subscriptions. <a href="/privacy">Privacy Policy</a> · <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">Terms of Use</a></p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- 11 · QUESTIONS -->
+<section class="stop" id="questions">
+  <div class="wrap">
+    <span class="eyebrow">Questions</span>
+    <h2>Before you decide.</h2>
+    <div class="faq">
+      <details><summary>Why pay when FerryFriend is free?</summary><p>Because the comparison is the product. No free app answers "ferry or drive, from here, now", and the watch that follows a commitment isn't a lookup feature. The schedules, cameras and space counts are here too, so nothing is missing.</p></details>
+      <details><summary>I live on Whidbey. There's no drive-around.</summary><p>You get the ferry-only verdict: which boat you can make, when to be in line, and the same watch once you commit.</p></details>
+      <details><summary>Is the drive-up space number a guarantee?</summary><p>No. It's an estimate built from WSF's count and our queue model, and the app says when it's unsure. Never a guarantee.</p></details>
+      <details><summary>Will it drain my battery?</summary><p>The location session starts shortly before you need to leave and ends itself when the boat departs. Nothing runs between trips.</p></details>
+      <details><summary>Does it work without signal at the dock?</summary><p>The pass is cached, the timetable is on the phone, and the app says "Offline" rather than inventing a recommendation.</p></details>
+      <details><summary>What about reservation routes?</summary><p>Port Townsend–Coupeville and the San Juans are covered for schedules and status. The app never promises a drive-up spot on a reservation sailing.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 12 · THE FAR SHORE -->
+<section class="close" id="go">
+  <div class="wrap">
+    <h2>Catch the boat, or beat it.</h2>
+    <a class="btn" data-cta="close" href="#">Download on the App Store</a>
+    <p class="small" style="margin:18px auto 0;max-width:40ch">Ten crossings. Seven days free. Nothing about you leaves your phone.</p>
+  </div>
+</section>
+
 </main>
 
-<footer><div class="wrap">
-  FerryOrNot is a product of Chowen Labs, LLC, Bainbridge Island, WA. · <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a><br>
-  © 2026 Chowen Labs, LLC<br>
-  <a href="/privacy">Privacy Policy</a> · <a href="/support">Support</a>
-</div></footer>
+<footer>
+  <div class="wrap cols">
+    <div>
+      <p class="disc">Ferry schedules, vessel status, and drive-up space are provided by WSDOT / Washington State Ferries; traffic from Apple Maps. Space counts are advisory estimates, not guarantees. <strong>FerryOrNot is not affiliated with or endorsed by Washington State Ferries or WSDOT.</strong></p>
+      <p style="margin-top:12px">FerryOrNot is a product of Chowen Labs, LLC, Bainbridge Island, WA. · <a href="mailto:robb@chowenlabs.com">robb@chowenlabs.com</a><br>© 2026 Chowen Labs, LLC</p>
+    </div>
+    <nav aria-label="Footer">
+      <a href="#decides">How it decides</a><a href="#edge">The edge</a><a href="#pricing">Pricing</a><a href="/support">Support</a><a href="/privacy">Privacy Policy</a>
+    </nav>
+  </div>
+</footer>
+
+<div class="stick" id="stick"><a class="btn" data-cta="sticky" href="#">Download · 7 days free</a></div>
+
+<script src="/site.js" defer></script>
 </body>
 </html>
