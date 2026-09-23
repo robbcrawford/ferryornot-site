@@ -131,7 +131,8 @@ section.stop .lede{margin-top:18px}
 @media (max-width:720px){section.stop{padding:64px 0}}
 
 /* 02 the bet */
-.bet{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}
+.bet{display:grid;grid-template-columns:minmax(0,1fr);gap:48px}
+.bet .copy{max-width:68ch}
 .bet .copy p+p{margin-top:14px}
 .chart{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:10px;box-shadow:var(--shadow);position:relative}
 .mapwrap{position:relative;aspect-ratio:600/470;border-radius:10px;overflow:hidden;background:var(--map-water);display:none}
@@ -160,7 +161,35 @@ section.stop .lede{margin-top:18px}
 .chart .lbl.dim{fill:var(--muted);font-size:10px;font-weight:400;letter-spacing:.04em}
 @keyframes draw{to{stroke-dashoffset:0}}
 @media (prefers-reduced-motion:reduce){.chart .boat,.chart .drive{stroke-dashoffset:0;animation:none}}
-@media (max-width:860px){.bet{grid-template-columns:1fr;gap:30px}}
+@media (max-width:860px){.bet{gap:30px}}
+/* #252 — the same trip two ways, on one clock */
+.race{margin:40px 0 0;padding:16px}
+.raceclock{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:2px 6px 12px;margin-bottom:14px;border-bottom:1px solid var(--hair)}
+.raceclock .k{font:600 11px/1.2 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.raceclock b{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1}
+.lanes{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.chart.live .lanes{display:grid}
+.chart.live .raceclock{display:flex}
+.raceclock{display:none}
+.lane{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lanehead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:0 4px}
+.lane .tag{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.lane.ferry .tag{color:var(--brass)}
+.lane.road .tag{color:var(--ink)}
+.lane .tot{font-family:var(--serif);font-size:20px;font-weight:600}
+.lane .mapwrap{display:block;aspect-ratio:10/9}
+.lanefoot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;padding:0 4px;min-height:24px;font-size:14px}
+.lanefoot .st{color:var(--muted)}
+.lanefoot .arr{font-weight:600;transition:opacity .35s}
+.lane.ferry .arr{color:var(--green)}
+.lane.road .arr{color:var(--ink)}
+.lanefoot .arr.wait{opacity:0}
+.race .mapcap{margin-top:12px;text-align:center}
+.boatglyph{pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+.boatglyph .hull{fill:var(--brass);stroke:var(--card);stroke-width:1.4}
+.boatglyph .deck{fill:var(--card);opacity:.85}
+.mlbl.note.inline{color:var(--ink)}
+@media (max-width:720px){.lanes{grid-template-columns:minmax(0,1fr)}.race{padding:12px}.raceclock b{font-size:24px}}
 
 /* 03 how it decides */
 .compare{margin-top:36px;background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:26px;box-shadow:var(--shadow)}
