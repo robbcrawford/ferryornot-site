@@ -456,8 +456,68 @@
     var cap = document.getElementById('decide-cap');
     if (cap) cap.textContent = d.cap || '';
     var legs = document.getElementById('legs-ferry');
-    if (legs) legs.innerHTML = ['drive', 'wait', 'sailing', 'drive'].map(function (n, k) { return '<span>' + d.ferry.legs[k] + 'm ' + n + '</span>'; }).join('');
+    if (legs) legs.innerHTML = ['drive', 'wait', 'sailing', 'drive'].map(function (n, k) {
+      return '<span class="k-' + ['drive', 'wait', 'sail', 'drive'][k] + '"><b>' + d.ferry.legs[k] + 'm</b> <i>' + n + '</i></span>';
+    }).join('');
+    followCallouts();
   }
+
+  // ★ #253: a label per segment, under that segment, with a leader to it. The bar is sized
+  // by minutes and the labels used to be spread evenly, so "4m wait" sat nowhere near its
+  // 4-minute sliver (owner, 2026-09-23). Positions are MEASURED from the rendered bar, so
+  // they follow the flex-basis transition frame by frame; labels that would collide fan
+  // out sideways, and when four cannot share a row (phones) alternate labels drop a row.
+  function layoutCallouts() {
+    var bar = document.getElementById('bar-ferry'), wrap = document.getElementById('legs-ferry');
+    if (!bar || !wrap) return;
+    var spans = [].slice.call(wrap.querySelectorAll('span')), segs = [].slice.call(bar.children);
+    if (!spans.length || spans.length !== segs.length) return;
+    var W = wrap.clientWidth, x0 = wrap.getBoundingClientRect().left, GAP = 10;
+    var tx = segs.map(function (s) { var r = s.getBoundingClientRect(); return r.left - x0 + r.width / 2; });
+    var w;
+    function measure() { w = spans.map(function (s) { return s.offsetWidth; }); }
+    function place(rows) {
+      var left = [], top = [], step = wrap.classList.contains('stack') ? 30 : 16;
+      rows.forEach(function (idx, r) {
+        idx.forEach(function (i) { left[i] = tx[i] - w[i] / 2; top[i] = 13 + r * step; });
+        for (var k = 0; k < idx.length; k++) {           // sweep right: no overlaps
+          var i = idx[k]; left[i] = Math.max(left[i], k ? left[idx[k - 1]] + w[idx[k - 1]] + GAP : 0);
+        }
+        for (k = idx.length - 1; k >= 0; k--) {          // sweep back: stay inside the card
+          i = idx[k]; left[i] = Math.min(left[i], k < idx.length - 1 ? left[idx[k + 1]] - GAP - w[i] : W - w[i]);
+          left[i] = Math.max(0, left[i]);
+        }
+      });
+      var worst = Math.max.apply(null, spans.map(function (s, i) { return Math.abs(left[i] + w[i] / 2 - tx[i]); }));
+      return { left: left, top: top, worst: worst };
+    }
+    // Minutes over the leg's name — the hero card's own shape, and narrow enough that four
+    // labels share a row even on a phone, fanning out with angled leaders round a sliver.
+    // A second row is the last resort: its leaders cross the first row's text.
+    var all = spans.map(function (s, i) { return i; });
+    wrap.classList.remove('two'); measure();
+    var L = place([all]);
+    if (L.worst > 70) {
+      var L2 = place([all.filter(function (i) { return i % 2 === 0; }), all.filter(function (i) { return i % 2 === 1; })]);
+      if (L2.worst < L.worst) { L = L2; wrap.classList.add('two'); }
+    }
+    var left = L.left, top = L.top;
+    var paths = spans.map(function (s, i) {
+      s.style.left = left[i] + 'px'; s.style.top = top[i] + 'px';
+      var cx = left[i] + w[i] / 2, y = top[i] - 2;
+      return 'M' + tx[i].toFixed(1) + ',-5 V' + Math.min(4, y - 6) + ' L' + cx.toFixed(1) + ',' + y;
+    });
+    var svg = wrap.querySelector('svg');
+    if (!svg) { svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('aria-hidden', 'true'); wrap.insertBefore(svg, wrap.firstChild); }
+    svg.innerHTML = paths.map(function (d) { return '<path d="' + d + '"/>'; }).join('');
+  }
+  var calloutRun = 0;
+  function followCallouts() {   // track the bar through its .3s transition, then settle
+    var until = performance.now() + 450, run = ++calloutRun;
+    (function tick() { if (run !== calloutRun) return; layoutCallouts(); if (performance.now() < until) requestAnimationFrame(tick); })();
+  }
+  window.addEventListener('resize', layoutCallouts);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutCallouts);
   if (chips && real.length > 1) {
     chips.hidden = false;
     real.forEach(function (d, i) {
