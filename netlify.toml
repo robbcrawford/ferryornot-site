@@ -35,6 +35,8 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
 
 # Long-cache the immutable brand images; HTML stays fresh.
+# ⚠️ /assets/* is cached for a YEAR: never change an asset in place — give the new
+# version a new file name (decide-now-v2.webp), or returning visitors keep the old one.
 [[headers]]
   for = "/*.png"
   [headers.values]

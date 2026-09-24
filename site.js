@@ -420,7 +420,7 @@
       line: 'Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.',
       ferry: { legs: [17, 7, 33, 8], sub: '1 HR 6 M · DOOR TO DOOR', flag: 'SOONER BY 43 MIN' },
       drive: { min: 109, sub: '1 HR 49 M · BY THE NARROWS', legs: '109m driving · live traffic', flag: '' },
-      shot: '/assets/decide-now.webp', cap: 'Thursday 12:50 PM · Bainbridge → Seattle',
+      shot: '/assets/decide-now-v2.webp', cap: 'Thursday 12:50 PM · Bainbridge → Seattle',
       alt: 'The Decision screen: Take the 1:15 PM ferry, 43 min sooner than driving around' },
     { key: 'arrive', chip: 'Arrive by 2:00 PM',
       // The app's reading taken Wednesday 2026-09-23 for Thursday: arrive by 2:00 PM, Fay
@@ -428,13 +428,13 @@
       line: 'To arrive by 2:00 PM, <em>the 1:15 PM ferry</em> lets you leave 58 min later than the road.',
       ferry: { legs: [17, 4, 33, 11], sub: 'LEAVE BY 12:54 PM · 1 HR 5 M DOOR TO DOOR', flag: 'LEAVE 58 MIN LATER' },
       drive: { min: 124, sub: 'LEAVE BY 11:56 AM · 2 HR 4 M', legs: '124m driving · predicted traffic', flag: '' },
-      shot: '/assets/decide-arrive.webp', cap: 'Thursday · arrive by 2:00 PM, planned the day before',
+      shot: '/assets/decide-arrive-v2.webp', cap: 'Thursday · arrive by 2:00 PM, planned the day before',
       alt: 'The Decision screen in Arrive-by mode: to arrive by 1:59 PM the ferry lets you leave 58 min later than driving around, leave by 12:54 PM for the 1:15 PM' },
     { key: 'drive', chip: 'Leave now · late night',
       line: 'Leaving now at 11:29 PM, <em>stay on land</em> — the ferry would have you waiting 79 min at the dock.',
       ferry: { legs: [5, 79, 33, 5], sub: '2 HR 2 M · 79 MIN WAITING AT THE DOCK', flag: '' },
       drive: { min: 94, sub: '1 HR 34 M · BY THE NARROWS', legs: '94m driving · no stops', flag: 'SOONER BY 29 MIN' },
-      shot: '/assets/decide-drive.webp', cap: 'Monday 11:29 PM · Bainbridge → Seattle',
+      shot: '/assets/decide-drive-v2.webp', cap: 'Monday 11:29 PM · Bainbridge → Seattle',
       alt: 'The Decision screen: Stay on land, driving gets you there 29 min sooner, the ferry would have you waiting 79 min at the dock' }
   ];
   var chips = document.getElementById('chips');
