@@ -413,8 +413,8 @@
   }
 
   /* ---------- how it decides: three states, only real ones render ---------- */
-  // Each state is a real capture (the 2026-09-17 afternoon set and the 2026-09-21 night
-  // set). Minutes drive the bar widths; the phone beside the bars shows the frame itself.
+  // Each state is a real capture (the 2026-09-17 afternoon set, a 2026-09-23 arrive-by
+  // reading for the next midday, and the 2026-09-21 night set). Minutes drive the bar widths; the phone beside the bars shows the frame itself.
   var DECISIONS = [
     { key: 'now', chip: 'Leave now · afternoon',
       line: 'Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.',
@@ -422,12 +422,14 @@
       drive: { min: 109, sub: '1 HR 49 M · BY THE NARROWS', legs: '109m driving · live traffic', flag: '' },
       shot: '/assets/decide-now.webp', cap: 'Thursday 12:50 PM · Bainbridge → Seattle',
       alt: 'The Decision screen: Take the 1:15 PM ferry, 43 min sooner than driving around' },
-    { key: 'arrive', chip: 'Arrive by 2:00 AM',
-      line: 'To arrive by 2:00 AM, <em>the 12:55 AM ferry</em> lets you leave 19 min later than the road.',
-      ferry: { legs: [5, 4, 33, 4], sub: 'LEAVE BY 12:46 AM · 46 M DOOR TO DOOR', flag: 'LEAVE 19 MIN LATER' },
-      drive: { min: 94, sub: 'LEAVE BY 12:26 AM · 1 HR 34 M', legs: '94m driving · live traffic', flag: '' },
-      shot: '/assets/decide-arrive.webp', cap: 'Monday 11:32 PM · arrive by 2:00 AM',
-      alt: 'The Decision screen in Arrive-by mode: to arrive by 1:32 AM the ferry lets you leave 19 min later, leave by 12:46 AM for the 12:55 AM' },
+    { key: 'arrive', chip: 'Arrive by 2:00 PM',
+      // The app's reading taken Wednesday 2026-09-23 for Thursday: arrive by 2:00 PM, Fay
+      // Bainbridge Park → Seattle Center (DEBUG decision dump + the capture beside it).
+      line: 'To arrive by 2:00 PM, <em>the 1:15 PM ferry</em> lets you leave 58 min later than the road.',
+      ferry: { legs: [17, 4, 33, 11], sub: 'LEAVE BY 12:54 PM · 1 HR 5 M DOOR TO DOOR', flag: 'LEAVE 58 MIN LATER' },
+      drive: { min: 124, sub: 'LEAVE BY 11:56 AM · 2 HR 4 M', legs: '124m driving · predicted traffic', flag: '' },
+      shot: '/assets/decide-arrive.webp', cap: 'Thursday · arrive by 2:00 PM, planned the day before',
+      alt: 'The Decision screen in Arrive-by mode: to arrive by 1:59 PM the ferry lets you leave 58 min later than driving around, leave by 12:54 PM for the 1:15 PM' },
     { key: 'drive', chip: 'Leave now · late night',
       line: 'Leaving now at 11:29 PM, <em>stay on land</em> — the ferry would have you waiting 79 min at the dock.',
       ferry: { legs: [5, 79, 33, 5], sub: '2 HR 2 M · 79 MIN WAITING AT THE DOCK', flag: '' },
@@ -448,9 +450,9 @@
     document.getElementById('drive-sub').textContent = d.drive.sub;
     document.getElementById('drive-legs').textContent = d.drive.legs;
     var flag = document.getElementById('flag');
-    if (flag) { flag.textContent = d.ferry.flag || ''; flag.hidden = !d.ferry.flag; }
+    if (flag) { flag.textContent = d.ferry.flag || '\u00a0'; flag.hidden = !d.ferry.flag; }
     var dflag = document.getElementById('dflag');
-    if (dflag) { dflag.textContent = d.drive.flag || ''; dflag.hidden = !d.drive.flag; }
+    if (dflag) { dflag.textContent = d.drive.flag || '\u00a0'; dflag.hidden = !d.drive.flag; }
     var shot = document.getElementById('decide-shot');
     if (shot && d.shot) { shot.src = d.shot; shot.alt = d.alt || ''; }
     var cap = document.getElementById('decide-cap');
@@ -533,6 +535,31 @@
     });
   }
   if (real[0]) render(real[0]);
+  // The verdict sentence differs in length per state, and a line more or less moved the
+  // whole card (owner, 2026-09-23). Reserve the tallest of the three at this width —
+  // two lines on desktop, up to four on a phone — and re-measure on resize.
+  function reserve(el, htmls) {
+    if (!el) return;
+    var keep = el.innerHTML, tallest = 0;
+    el.style.minHeight = '';
+    htmls.forEach(function (h) { el.innerHTML = h; tallest = Math.max(tallest, el.offsetHeight); });
+    el.innerHTML = keep; el.style.minHeight = tallest + 'px';
+  }
+  function sizeVerdict() {   // the sentence and both small lines under the option names
+    reserve(document.getElementById('verdictline'), real.map(function (d) { return d.line; }));
+    reserve(document.getElementById('ferry-sub'), real.map(function (d) { return d.ferry.sub; }));
+    reserve(document.getElementById('drive-sub'), real.map(function (d) { return d.drive.sub; }));
+    // Both badges, each measured with EVERY state's text: a two-line "LEAVE 58 MIN LATER" in
+    // the narrow name column moved the bars beside it.
+    var flags = [].concat.apply([], real.map(function (d) { return [d.ferry.flag, d.drive.flag]; })).filter(Boolean);
+    ['flag', 'dflag'].forEach(function (id) {
+      var f = document.getElementById(id); if (!f) return;
+      var hid = f.hidden; f.hidden = false; reserve(f, flags); f.hidden = hid;
+    });
+  }
+  sizeVerdict();
+  var sizeT; window.addEventListener('resize', function () { clearTimeout(sizeT); sizeT = setTimeout(sizeVerdict, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(sizeVerdict);
 
   /* ---------- checks ledger fills in ---------- */
   var ledger = document.getElementById('ledger');

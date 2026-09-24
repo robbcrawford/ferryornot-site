@@ -217,7 +217,7 @@ section.stop .lede{margin-top:18px}
 .opt .name{font-family:var(--serif);font-size:20px;font-weight:600;line-height:1.15}
 .opt .name small{display:block;font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--muted);margin-top:4px}
 .opt .name .flag{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--green);border:1px solid var(--green);border-radius:999px;padding:4px 8px;margin-top:8px}
-.opt .name .flag[hidden]{display:none}
+.opt .name .flag[hidden]{display:inline-block;visibility:hidden}   /* keeps its row, so switching states doesn't shift the bars */
 .opt .jbar{margin:0 0 6px;height:14px}
 .opt .jbar i{transition:flex-basis .3s ease}
 .opt .jl{font-size:11.5px}
@@ -232,7 +232,7 @@ section.stop .lede{margin-top:18px}
 .jl.callouts .k-wait,.jl.callouts .k-sail{color:var(--brass)}
 .jl.callouts svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .jl.callouts path{fill:none;stroke:var(--muted);stroke-width:1;opacity:.55}
-.compare .verdictline{font-family:var(--serif);font-size:22px;margin:0 0 18px}
+.compare .verdictline{font-family:var(--serif);font-size:22px;line-height:1.35;min-height:2.7em;margin:0 0 18px}
 .compare .verdictline em{font-style:normal;color:var(--brass)}
 .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
 .modes div{border-top:2px solid var(--brass);padding-top:12px}
