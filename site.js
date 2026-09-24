@@ -100,32 +100,54 @@
   // Fallback: the schematic SVG draws itself if the map can't run.
   function drawFallback() { chart.classList.add('draw'); }
 
-  /* #252 — the same trip two ways, on ONE clock. Every leg runs in proportion to its
-     real minutes (the app's own reading, 2026-09-17 12:50 PM), so the gap between the
-     two arrivals on screen is the gap on the road. Nothing here is decorative timing. */
-  var TRIP = { start: 12 * 60 + 50, toDock: 17, wait: 7, sail: 33, fromDock: 8, ferryTotal: 66, around: 109, boat: '1:15 PM' };
-  var MS_PER_MIN = 120, WAIT_MS_PER_MIN = 430, HOLD = 2600;
-  // ★ THE CLOCK SLOWS WHILE THE CAR IS IN LINE — both lanes together, so the one clock
-  // stays true and only the playback rate changes. At 120 ms a minute the 7-minute wait
-  // was gone in under a second and read as no wait at all (owner, 2026-09-23).
-  var LEG = TRIP.ferryTotal / (TRIP.toDock + TRIP.wait + TRIP.sail + TRIP.fromDock);   // legs sum to 65; the trip is 1 hr 6 m
-  var AT = { dock: TRIP.toDock * LEG, board: (TRIP.toDock + TRIP.wait) * LEG, land: (TRIP.toDock + TRIP.wait + TRIP.sail) * LEG, done: TRIP.ferryTotal };
-  var PLAY_MS = TRIP.around * MS_PER_MIN + (AT.board - AT.dock) * (WAIT_MS_PER_MIN - MS_PER_MIN);
-  function minuteAt(ms) {
-    var a = AT.dock * MS_PER_MIN, b = a + (AT.board - AT.dock) * WAIT_MS_PER_MIN;
-    if (ms <= a) return ms / MS_PER_MIN;
-    if (ms <= b) return AT.dock + (ms - a) / WAIT_MS_PER_MIN;
-    return Math.min(TRIP.around, AT.board + (ms - b) / MS_PER_MIN);
-  }
-  function bearing(c, d, t) {   // degrees clockwise from north, along the path at fraction t
-    var p = along(c, d, Math.max(0, t - 0.01)), q = along(c, d, Math.min(1, t + 0.01));
-    var kx = Math.cos(p[1] * Math.PI / 180);
-    return Math.atan2((q[0] - p[0]) * kx, q[1] - p[1]) * 180 / Math.PI;
-  }
+  /* #252 — the same trip two ways, on ONE clock, in two real situations.
+     ★ THE CAR'S LEGS, THE COUNTDOWN AND THE ARRIVALS ARE THE APP'S OWN READINGS (the
+     Thursday 12:50 PM capture and a Wednesday 8:45 PM decision dump). THE BOATS RUN THE
+     TIMETABLE of those two days, from our own sailing records (sailing_instances, 09-17, 09-23):
+     every glyph is where WSF had that boat. Times below are minutes after `start`.
+     Both states are times when BOTH boats were sailing (owner, 2026-09-23): a late-night
+     one-boat reading was tried first and would have needed one boat drawn tied up. */
+  var SCENES = {
+    made: {
+      start: 12 * 60 + 50, day: 'Thursday', toDock: 17, wait: 7, fromDock: 8, ferryTotal: 66, around: 109,
+      caught: 'tacoma', boatLabel: '1:15 PM', pick: 'ferry',
+      verdict: 'The app’s answer: <em>take the 1:15 PM ferry</em>, 43 min sooner.',
+      ferryDone: '43 min sooner than driving around', driveDone: 'By the Tacoma Narrows · live traffic',
+      tot: ['1 hr 6 m', '1 hr 49 m'], fromStart: 0, fromEnd: 1,
+      boats: {
+        // SEA 12:25 → BI 12:58, BI 1:15 → SEA 1:48 (you), SEA 2:05 → BI 2:38
+        tacoma: [['in', -25, 8], ['dock', 'bi', 8, 25], ['out', 25, 58], ['dock', 'sea', 58, 75], ['in', 75, 108], ['dock', 'bi', 108, 999]],
+        // BI 12:20 → SEA 12:53, SEA 1:10 → BI 1:43, BI 2:05 → SEA 2:38
+        wenatchee: [['out', -30, 3], ['dock', 'sea', 3, 20], ['in', 20, 53], ['dock', 'bi', 53, 75], ['out', 75, 108], ['dock', 'sea', 108, 999]]
+      }
+    },
+    missed: {
+      // The app's reading for Wednesday 2026-09-23, leave at 8:45 PM, Fay Bainbridge Park →
+      // Seattle Center (DEBUG decision dump): 14 min to the dock, "you'd reach the dock at
+      // 8:59 PM, after its 8:56 PM line-by", 61 min for the 10:00, 33 on the water, 10 on
+      // the far side = 1 hr 58 m; driving around 1 hr 44 m. Answer: drive around.
+      start: 20 * 60 + 45, day: 'Wednesday', toDock: 14, wait: 61, fromDock: 10, ferryTotal: 118, around: 104,
+      caught: 'wenatchee', boatLabel: '10:00 PM', missedLabel: '9:00 PM', missedAt: 15, lineClosed: '8:56 PM', pick: 'drive',
+      verdict: 'The app’s answer: <em>drive around</em>, 14 min sooner than the Bainbridge ferry. You’d reach the dock at 8:59 PM, after the 9:00 PM’s 8:56 line-by.',
+      ferryDone: '61 min waiting at the dock', driveDone: 'By the Tacoma Narrows · the app’s pick',
+      tot: ['1 hr 58 m', '1 hr 44 m'], fromStart: 0, fromEnd: 1,
+      boats: {
+        // SEA 8:15 → BI 8:48; BI 9:00 → SEA 9:33 (the one you just miss); SEA 10:05 → BI 10:38
+        tacoma: [['in', -30, 3], ['dock', 'bi', 3, 15], ['out', 15, 48], ['dock', 'sea', 48, 80], ['in', 80, 113], ['dock', 'bi', 113, 999]],
+        // BI 8:20 → SEA 8:53; SEA 9:20 → BI 9:53; BI 10:00 → SEA 10:33 (you)
+        wenatchee: [['out', -25, 8], ['dock', 'sea', 8, 35], ['in', 35, 68], ['dock', 'bi', 68, 75], ['out', 75, 108], ['dock', 'sea', 108, 999]]
+      }
+    }
+  };
+  // A short wait is SLOWED to at least WAIT_SHOW_MS so it can be seen; a long one runs at
+  // the normal rate — squeezing an 81-minute wait into 3 s made a boat's round trip
+  // flash past unseen (owner, 2026-09-23). The long wait is the point of that state.
+  var MS_PER_MIN = 120, HOLD = 2600, WAIT_SHOW_MS = 3000;
+  function waitMs(T) { return Math.max(WAIT_SHOW_MS, (T.board - T.dock) * MS_PER_MIN); }
 
   function clock(min) {
-    var t = TRIP.start + Math.round(min), h = Math.floor(t / 60) % 12 || 12, m = t % 60;
-    return h + ':' + (m < 10 ? '0' : '') + m + ' PM';
+    var t = ((Math.round(min) % 1440) + 1440) % 1440, h = Math.floor(t / 60), m = t % 60;
+    return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
   }
   function cum(coords) {
     var d = [0]; for (var i = 1; i < coords.length; i++) {
@@ -144,15 +166,33 @@
     for (var i = 0; i < c.length; i++) if (d[i] > L0 && d[i] < L1) out.push(c[i]);
     out.push(along(c, d, t1)); return out;
   }
+  function bearing(c, d, t) {
+    var p = along(c, d, Math.max(0, t - 0.01)), q = along(c, d, Math.min(1, t + 0.01)), kx = Math.cos(p[1] * Math.PI / 180);
+    return Math.atan2((q[0] - p[0]) * kx, q[1] - p[1]) * 180 / Math.PI;
+  }
   function path(coords) { return { c: coords, d: cum(coords) }; }
   var clamp = function (x) { return Math.max(0, Math.min(1, x)); };
   var LINE = function (c) { return { type: 'Feature', geometry: { type: 'LineString', coordinates: c } }; };
-  var PTS = function (list) { return { type: 'FeatureCollection', features: list.map(function (p) { return { type: 'Feature', properties: { color: p[1], kind: p[2] || 'car', r: p[3] || 14 }, geometry: { type: 'Point', coordinates: p[0] } }; }) }; };
+  var PTS = function (list) { return { type: 'FeatureCollection', features: list.map(function (p) { return { type: 'Feature', properties: { color: p[1], r: p[3] || 14 }, geometry: { type: 'Point', coordinates: p[0] } }; }) }; };
+
+  // The car's own timeline, from the app's legs; it boards when the caught boat sails.
+  function plan(S) {
+    var sail = S.boats[S.caught].filter(function (k) { return k[0] === 'out'; })
+      .filter(function (k) { return k[1] >= S.toDock; })[0];
+    return { dock: S.toDock, board: sail[1], land: sail[2], done: S.ferryTotal, end: Math.max(S.ferryTotal, S.around) };
+  }
+  function minuteAt(S, T, ms) {   // the clock slows (or speeds) only while the car is in line
+    var rate = waitMs(T) / (T.board - T.dock), a = T.dock * MS_PER_MIN, b = a + waitMs(T);
+    if (ms <= a) return ms / MS_PER_MIN;
+    if (ms <= b) return T.dock + (ms - a) / rate;
+    return Math.min(T.end, T.board + (ms - b) / MS_PER_MIN);
+  }
+  function playMs(T) { return T.dock * MS_PER_MIN + waitMs(T) + (T.end - T.board) * MS_PER_MIN; }
 
   function initRace(routes) {
     var cs = function (n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); };
     var C = {};
-    function readTheme() { ['map-water', 'map-land', 'map-park', 'map-road', 'map-hwy', 'map-coast', 'brass', 'ink', 'red', 'card', 'green'].forEach(function (k) { C[k] = cs('--' + k); }); }
+    function readTheme() { ['map-water', 'map-land', 'map-park', 'map-road', 'map-hwy', 'map-coast', 'brass', 'ink', 'card'].forEach(function (k) { C[k] = cs('--' + k); }); }
     readTheme();
     var protocol = new pmtiles.Protocol();
     maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -169,9 +209,9 @@
       ] };
     }
     var byKind = {}; routes.features.forEach(function (f) { byKind[f.properties.kind] = f.geometry.coordinates; });
-    var P = { toDock: path(byKind.toDock), sail: path(byKind.sail), fromDock: path(byKind.fromDock), around: path(byKind.around) };
-    // The inbound boat is the same crossing sailed the other way.
-    P.inbound = path(byKind.sail.slice().reverse());
+    var P = { toDock: path(byKind.toDock), out: path(byKind.sail), fromDock: path(byKind.fromDock), around: path(byKind.around) };
+    P['in'] = path(byKind.sail.slice().reverse());   // the same lane, sailed the other way
+    var BERTH = { bi: byKind.sail[0], sea: byKind.sail[byKind.sail.length - 1] };
 
     chart.classList.add('live');
     var maps = [];
@@ -182,11 +222,12 @@
       var fit = function () { m.fitBounds(bounds, { padding: pad, duration: 0 }); };
       fit(); requestAnimationFrame(function () { m.resize(); fit(); });
       window.addEventListener('resize', function () { m.resize(); fit(); });
-      labels.forEach(function (l) {
+      var markers = labels.map(function (l) {
         var el = document.createElement('div'); el.className = l[2]; if (l[1]) el.textContent = l[1];
-        new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(l[0]).addTo(m);
+        return new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(l[0]).addTo(m);
       });
-      var ready = new Promise(function (res) {
+      var rec = { m: m, tracks: tracks, markers: markers };
+      rec.ready = new Promise(function (res) {
         m.on('load', function () {
           tracks.forEach(function (t) {
             m.addSource(t[0], { type: 'geojson', data: LINE(t[1]) });
@@ -195,27 +236,18 @@
           m.addSource('done', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
           m.addLayer({ id: 'done', type: 'line', source: 'done', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 4 } });
           m.addSource('heads', { type: 'geojson', data: PTS([]) });
-          m.addLayer({ id: 'head-glow', type: 'circle', source: 'heads', paint: { 'circle-radius': ['coalesce', ['get', 'r'], 14], 'circle-color': ['get', 'color'], 'circle-opacity': 0.28, 'circle-blur': 1 } });
-          m.addLayer({ id: 'head-core', type: 'circle', source: 'heads', paint: { 'circle-radius': ['match', ['get', 'kind'], 'boat', 6.5, 4.5], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
-          res();
+          m.addLayer({ id: 'head-glow', type: 'circle', source: 'heads', paint: { 'circle-radius': ['get', 'r'], 'circle-color': ['get', 'color'], 'circle-opacity': 0.28, 'circle-blur': 1 } });
+          m.addLayer({ id: 'head-core', type: 'circle', source: 'heads', paint: { 'circle-radius': 4.5, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+          rec.loaded = true; res();
         });
       });
-      var rec = { m: m, tracks: tracks, ready: ready };
       maps.push(rec); return rec;
     }
     var ferry = makeMap('map-ferry', [['t-todock', byKind.toDock, 'ink', 2], ['t-sail', byKind.sail, 'brass', 2.5], ['t-fromdock', byKind.fromDock, 'ink', 2]], [
-      [[-122.497, 47.668], 'Bainbridge', 'mlbl'], [[-122.318, 47.592], 'Seattle', 'mlbl'],
+      [[-122.497, 47.668], 'Bainbridge', 'mlbl'], [[-122.372, 47.648], 'Seattle', 'mlbl'],
       [byKind.toDock[0], '', 'mdot'], [byKind.fromDock[byKind.fromDock.length - 1], '', 'mdot to'],
       [[-122.43, 47.595], '33 min on the water', 'mlbl note']
     ], { top: 34, bottom: 34, left: 34, right: 44 });
-    // ★ THE BOAT (owner, 2026-09-23): a glyph, not a dot — it comes in, docks, turns
-    // round, and carries the car across. Drawn bow-up; the marker rotates it to heading.
-    var boatEl = document.createElement('div'); boatEl.className = 'boatglyph';
-    boatEl.innerHTML = '<svg viewBox="0 0 16 40" width="16" height="40" aria-hidden="true"><path class="hull" d="M8 1 C12 6 14 11 14 18 V35 C14 37.5 12 39 8 39 C4 39 2 37.5 2 35 V18 C2 11 4 6 8 1 Z"/><rect class="deck" x="5" y="14" width="6" height="16" rx="1.5"/></svg>';
-    var boat = new maplibregl.Marker({ element: boatEl, anchor: 'center', rotationAlignment: 'map' }).setLngLat(byKind.sail[0]).addTo(ferry.m);
-    var lineEl = document.createElement('div'); lineEl.className = 'mlbl note inline'; lineEl.hidden = true;
-    new maplibregl.Marker({ element: lineEl, anchor: 'bottom', offset: [0, -16] }).setLngLat(byKind.toDock[byKind.toDock.length - 1]).addTo(ferry.m);
-
     var drive = makeMap('map-drive', [['t-around', byKind.around, 'ink', 2]], [
       [[-122.27, 47.665], 'Seattle', 'mlbl'], [[-122.548, 47.668], 'Bainbridge', 'mlbl'],
       [[-122.662, 47.556], 'Bremerton', 'mlbl dim'], [[-122.44, 47.232], 'Tacoma', 'mlbl dim'],
@@ -223,56 +255,101 @@
       [byKind.around[0], '', 'mdot'], [byKind.around[byKind.around.length - 1], '', 'mdot to']
     ], { top: 26, bottom: 26, left: 26, right: 26 });
 
-    var el = { clock: document.getElementById('race-clock'), stF: document.getElementById('st-ferry'), stD: document.getElementById('st-drive'),
-               arrF: document.getElementById('arr-ferry'), arrD: document.getElementById('arr-drive') };
+    // ★ THE BOATS (owner, 2026-09-23): glyphs, both of them, in both states. Drawn bow-up.
+    var HULL = '<svg viewBox="0 0 16 40" width="16" height="40" aria-hidden="true"><path class="hull" d="M8 1 C12 6 14 11 14 18 V35 C14 37.5 12 39 8 39 C4 39 2 37.5 2 35 V18 C2 11 4 6 8 1 Z"/><rect class="deck" x="5" y="14" width="6" height="16" rx="1.5"/></svg>';
+    var glyph = {};
+    ['tacoma', 'wenatchee'].forEach(function (k) {
+      var el = document.createElement('div'); el.className = 'boatglyph'; el.innerHTML = HULL; el.title = k === 'tacoma' ? 'M/V Tacoma' : 'M/V Wenatchee';
+      glyph[k] = { el: el, mk: new maplibregl.Marker({ element: el, anchor: 'center', rotationAlignment: 'map' }).setLngLat(BERTH.bi).addTo(ferry.m) };
+    });
+    var lineEl = document.createElement('div'); lineEl.className = 'mlbl note inline'; lineEl.hidden = true;
+    new maplibregl.Marker({ element: lineEl, anchor: 'bottom', offset: [0, -16] }).setLngLat(byKind.toDock[byKind.toDock.length - 1]).addTo(ferry.m);
 
-    // ★ ONE FUNCTION OF ONE CLOCK. `min` is minutes since 12:50; both lanes read it.
-    function render(min) {
-      var done = [], heads = [], status, dock = P.toDock.c[P.toDock.c.length - 1];
-      var inb = P.inbound, out = P.sail, crossing = AT.land - AT.board;
-      var boatAt, boatDeg;
-      if (min < AT.dock) {
-        // On the road, and the boat you'll catch is out on the water coming in: it docks
-        // the minute you reach the line, so it is (17 of its 33 minutes) that far out.
-        var t = clamp(min / AT.dock);
-        done.push([slice(P.toDock.c, P.toDock.d, 0, t), C.ink]); heads.push([along(P.toDock.c, P.toDock.d, t), C.ink]);
-        var fi = clamp(1 - (AT.dock - min) / crossing);
-        boatAt = along(inb.c, inb.d, fi); boatDeg = bearing(inb.c, inb.d, fi);
-        status = 'Drive to the dock · ' + Math.max(1, Math.ceil((AT.dock - min) / LEG)) + ' min';
-      } else if (min < AT.board) {
-        // In line. The boat is in, and swings round to face Seattle over the first part
-        // of the wait; the car pulses in the holding lanes and the label counts down.
-        done.push([P.toDock.c, C.ink]);
-        var w = clamp((min - AT.dock) / (AT.board - AT.dock));
-        var from = bearing(inb.c, inb.d, 1), to = bearing(out.c, out.d, 0);
-        var turn = ((to - from + 540) % 360) - 180, e = clamp(w / 0.45); e = e * e * (3 - 2 * e);
-        boatAt = out.c[0]; boatDeg = from + turn * e;
-        heads.push([dock, C.ink, 'wait', 12 + 9 * (0.5 + 0.5 * Math.sin(min * 5))]);
-        var left = Math.max(1, Math.ceil((AT.board - min) / LEG));
-        status = 'In line at Bainbridge · the ' + TRIP.boat + ' is in';
-        lineEl.textContent = 'In line · ' + left + ' min';
-      } else if (min < AT.land) {
-        done.push([P.toDock.c, C.ink]);
-        var u = clamp((min - AT.board) / crossing);
-        done.push([slice(out.c, out.d, 0, u), C.brass]);
-        boatAt = along(out.c, out.d, u); boatDeg = bearing(out.c, out.d, u);   // the car is aboard
-        status = 'On the ' + TRIP.boat + ' · ' + Math.max(1, Math.ceil((AT.land - min) / LEG)) + ' min on the water';
-      } else {
-        done.push([P.toDock.c, C.ink]); done.push([out.c, C.brass]);
-        var v = clamp((min - AT.land) / (AT.done - AT.land));
-        done.push([slice(P.fromDock.c, P.fromDock.d, 0, v), C.ink]); heads.push([along(P.fromDock.c, P.fromDock.d, v), C.ink]);
-        boatAt = out.c[out.c.length - 1]; boatDeg = bearing(out.c, out.d, 1);
-        status = min < AT.done ? 'Driving into Seattle' : (TRIP.around - TRIP.ferryTotal) + ' min sooner than driving around';
+    // Where a boat is, and which way it faces, at minute `min` of its day.
+    function boatAt(frames, min) {
+      var heading = function (dir, t) { return bearing(P[dir].c, P[dir].d, t); };
+      for (var i = 0; i < frames.length; i++) {
+        var f = frames[i];
+        if (f[0] === 'in' || f[0] === 'out') {
+          if (min < f[2] || i === frames.length - 1) {
+            var t = clamp((min - f[1]) / (f[2] - f[1]));
+            return { at: along(P[f[0]].c, P[f[0]].d, t), deg: heading(f[0], t), sailing: f[0], t: t };
+          }
+        } else if (min < f[3] || i === frames.length - 1) {
+          // Docked: swing from the arriving heading to the departing one over the first
+          // part of the stay (the boats are double-ended; the turn is for the eye).
+          var prev = frames[i - 1], next = frames[i + 1];
+          var from = prev ? heading(prev[0], 1) : (next ? heading(next[0], 0) : 90);
+          var to = next ? heading(next[0], 0) : from;
+          var turn = ((to - from + 540) % 360) - 180, e = clamp((min - f[2]) / Math.max(1, (f[3] - f[2]) * 0.45));
+          e = e * e * (3 - 2 * e);
+          return { at: BERTH[f[1]], deg: from + turn * e };
+        }
       }
-      lineEl.hidden = !(min >= AT.dock && min < AT.board);
-      boat.setLngLat(boatAt); boat.setRotation(boatDeg);
-      var ta = clamp(min / TRIP.around);
-      var dDone = [[slice(P.around.c, P.around.d, 0, ta), C.ink]], dHead = [[along(P.around.c, P.around.d, ta), C.ink]];
-      var dStatus = min < TRIP.around ? ('By the Tacoma Narrows · ' + Math.ceil(TRIP.around - min) + ' min to go') : 'By the Tacoma Narrows · live traffic';
-      set(ferry, done, heads); set(drive, dDone, dHead);
-      el.clock.textContent = clock(min);
-      el.stF.textContent = status; el.stD.textContent = dStatus;
-      el.arrF.classList.toggle('wait', min < AT.done); el.arrD.classList.toggle('wait', min < TRIP.around);
+      return { at: BERTH.bi, deg: 90 };
+    }
+
+    var el = { clock: document.getElementById('race-clock'), k: document.getElementById('race-k'), verdict: document.getElementById('race-verdict'),
+               stF: document.getElementById('st-ferry'), stD: document.getElementById('st-drive'),
+               arrF: document.getElementById('arr-ferry'), arrD: document.getElementById('arr-drive'),
+               totF: document.getElementById('tot-ferry'), totD: document.getElementById('tot-drive'),
+               pickF: document.getElementById('pick-ferry'), pickD: document.getElementById('pick-drive') };
+    var S, T, toDock, fromDock;
+
+    function setScene(key) {
+      S = SCENES[key]; T = plan(S);
+      // A closer start and a nearer finish where a reading's legs are shorter (5 and 5, not 17
+      // and 8): the tail and head of the same roads, so nothing new is invented.
+      toDock = path(slice(P.toDock.c, P.toDock.d, S.fromStart, 1));
+      fromDock = path(slice(P.fromDock.c, P.fromDock.d, 0, S.fromEnd));
+      ferry.markers[2].setLngLat(toDock.c[0]); ferry.markers[3].setLngLat(fromDock.c[fromDock.c.length - 1]);
+      // The dashed plan underneath follows the scene's legs too, or one state shows the other's drive.
+      if (ferry.loaded) { ferry.m.getSource('t-todock').setData(LINE(toDock.c)); ferry.m.getSource('t-fromdock').setData(LINE(fromDock.c)); }
+      el.k.textContent = 'Leaving ' + clock(S.start) + ' · ' + S.day;
+      el.verdict.innerHTML = S.verdict;
+      el.totF.textContent = S.tot[0]; el.totD.textContent = S.tot[1];
+      el.arrF.textContent = 'Arrives ' + clock(S.start + S.ferryTotal); el.arrD.textContent = 'Arrives ' + clock(S.start + S.around);
+      el.pickF.hidden = S.pick !== 'ferry'; el.pickD.hidden = S.pick !== 'drive';
+      ['made', 'missed'].forEach(function (k) { document.getElementById('sc-' + k).setAttribute('aria-pressed', String(k === key)); });
+    }
+
+    function render(min) {
+      var done = [], heads = [], status, dockPt = toDock.c[toDock.c.length - 1];
+      if (min < T.dock) {
+        var t = clamp(min / T.dock);
+        done.push([slice(toDock.c, toDock.d, 0, t), C.ink]); heads.push([along(toDock.c, toDock.d, t), C.ink]);
+        status = 'Drive to the dock · ' + Math.max(1, Math.ceil(S.toDock - min)) + ' min';
+      } else if (min < T.board) {
+        done.push([toDock.c, C.ink]);
+        var w = clamp((min - T.dock) / (T.board - T.dock));
+        heads.push([dockPt, C.ink, 'wait', 12 + 9 * (0.5 + 0.5 * Math.sin((performance.now() / 1000) * 5))]);
+        status = S.missedLabel && min < S.missedAt + 5
+          ? 'Too late for the ' + S.missedLabel + ' · its line closed at ' + S.lineClosed
+          : 'In line at Bainbridge · next boat ' + S.boatLabel;
+        lineEl.textContent = 'In line · ' + Math.max(1, Math.ceil(S.wait * (1 - w))) + ' min';
+      } else if (min < T.land) {
+        done.push([toDock.c, C.ink]);
+        var u = clamp((min - T.board) / (T.land - T.board));
+        done.push([slice(P.out.c, P.out.d, 0, u), C.brass]);   // the car is aboard
+        status = 'On the ' + S.boatLabel + ' · ' + Math.max(1, Math.ceil(T.land - min)) + ' min on the water';
+      } else {
+        done.push([toDock.c, C.ink]); done.push([P.out.c, C.brass]);
+        var v = clamp((min - T.land) / Math.max(1, T.done - T.land));
+        done.push([slice(fromDock.c, fromDock.d, 0, v), C.ink]); heads.push([along(fromDock.c, fromDock.d, v), C.ink]);
+        status = min < T.done ? 'Driving into Seattle' : S.ferryDone;
+      }
+      lineEl.hidden = !(min >= T.dock && min < T.board);
+      Object.keys(glyph).forEach(function (k) {
+        var b = boatAt(S.boats[k], min);
+        glyph[k].mk.setLngLat(b.at); glyph[k].mk.setRotation(b.deg);
+      });
+      var ta = clamp(min / S.around);
+      set(ferry, done, heads);
+      set(drive, [[slice(P.around.c, P.around.d, 0, ta), C.ink]], [[along(P.around.c, P.around.d, ta), C.ink]]);
+      el.clock.textContent = clock(S.start + min);
+      el.stF.textContent = status;
+      el.stD.textContent = min < S.around ? ('By the Tacoma Narrows · ' + Math.ceil(S.around - min) + ' min to go') : S.driveDone;
+      el.arrF.classList.toggle('wait', min < T.done); el.arrD.classList.toggle('wait', min < S.around);
     }
     function set(rec, done, heads) {
       if (!rec.loaded) return;
@@ -295,17 +372,25 @@
     }
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
-    var lastMin = TRIP.around;
-    Promise.all(maps.map(function (r) { return r.ready.then(function () { r.loaded = true; }); })).then(function () {
-      if (reduce) { render(TRIP.around); return; }   // the finished frame: both routes, both arrivals
-      var loop = PLAY_MS + HOLD, start = null, running = true;
-      function frame(now) {
-        if (!running) return;
-        if (start === null) start = now;
-        lastMin = minuteAt((now - start) % loop);
-        render(lastMin);
-        requestAnimationFrame(frame);
-      }
+    var currentKey = 'made';
+    setScene(currentKey);
+    var lastMin = T.end, start = null, running = false;
+    function frame(now) {
+      if (!running) return;
+      if (start === null) start = now;
+      lastMin = minuteAt(S, T, (now - start) % (playMs(T) + HOLD));
+      render(lastMin);
+      requestAnimationFrame(frame);
+    }
+    ['made', 'missed'].forEach(function (k) {
+      document.getElementById('sc-' + k).addEventListener('click', function () {
+        currentKey = k; setScene(k); start = null; lastMin = reduce ? T.end : 0; render(lastMin);
+      });
+    });
+    Promise.all(maps.map(function (r) { return r.ready; })).then(function () {
+      setScene(currentKey);   // re-apply now the sources exist
+      if (reduce) { render(T.end); return; }   // the finished frame: both routes, both arrivals
+      running = true;
       new IntersectionObserver(function (en) {
         var on = en[0].isIntersecting;
         if (on && !running) { running = true; start = null; requestAnimationFrame(frame); }

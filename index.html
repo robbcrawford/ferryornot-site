@@ -94,16 +94,23 @@
     </div>
   </div>
   <div class="wrap">
-    <figure class="race chart" id="chart" aria-label="The same trip two ways, on one clock: the ferry arrives at 1:56 PM, the drive around at 2:39 PM">
-      <div class="raceclock" aria-hidden="true"><span class="k">Leaving 12:50 PM · Thursday</span><b class="tn" id="race-clock">12:50 PM</b></div>
+    <figure class="race chart" id="chart" aria-label="The same trip two ways, on one clock. Made the boat: the ferry arrives at 1:56 PM, the drive around at 2:39 PM. Just missed it: the drive around arrives at 10:29 PM, the ferry at 10:43 PM.">
+      <div class="racetop">
+        <div class="seg" role="group" aria-label="Which trip">
+          <button type="button" id="sc-made" aria-pressed="true">Made the boat</button>
+          <button type="button" id="sc-missed" aria-pressed="false">Just missed it</button>
+        </div>
+        <div class="raceclock" aria-hidden="true"><span class="k" id="race-k">Leaving 12:50 PM · Thursday</span><b class="tn" id="race-clock">12:50 PM</b></div>
+      </div>
+      <p class="raceverdict" id="race-verdict">The app's answer: <em>take the 1:15 PM ferry</em>, 43 min sooner.</p>
       <div class="lanes">
         <div class="lane ferry">
-          <div class="lanehead"><span class="tag">Take the ferry</span><span class="tot tn">1 hr 6 m</span></div>
+          <div class="lanehead"><span class="tag">Take the ferry <i class="pick" id="pick-ferry">The app's pick</i></span><span class="tot tn" id="tot-ferry">1 hr 6 m</span></div>
           <div class="mapwrap" id="map-ferry" role="img" aria-label="Map: drive to the Bainbridge dock, wait in line, cross to Seattle, drive on"></div>
           <div class="lanefoot"><span class="st" id="st-ferry">Drive to the dock · 17 min</span><span class="arr tn" id="arr-ferry">Arrives 1:56 PM</span></div>
         </div>
         <div class="lane road">
-          <div class="lanehead"><span class="tag">Drive around</span><span class="tot tn">1 hr 49 m</span></div>
+          <div class="lanehead"><span class="tag">Drive around <i class="pick" id="pick-drive" hidden>The app's pick</i></span><span class="tot tn" id="tot-drive">1 hr 49 m</span></div>
           <div class="mapwrap" id="map-drive" role="img" aria-label="Map: the drive around by the Tacoma Narrows"></div>
           <div class="lanefoot"><span class="st" id="st-drive">By the Tacoma Narrows · live traffic</span><span class="arr tn" id="arr-drive">Arrives 2:39 PM</span></div>
         </div>
@@ -140,7 +147,7 @@
           <text class="lbl dim" x="445" y="402">DRIVING AROUND</text>
         </svg>
       </div>
-      <figcaption class="small mapcap">Times are the app's own, from the same Thursday as the card above; the start and end points are illustrative. Real roads, real water. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, via Protomaps and OSRM, served from this site.</figcaption>
+      <figcaption class="small mapcap">Times are the app's own: a Thursday afternoon (the card above) and a Wednesday evening, September 2026. The boats run the day's timetable; the start and end points are illustrative. Real roads, real water. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, via Protomaps and OSRM, served from this site.</figcaption>
     </figure>
   </div>
 </section>
