@@ -310,6 +310,8 @@
       el.totF.textContent = S.tot[0]; el.totD.textContent = S.tot[1];
       el.arrF.textContent = 'Arrives ' + clock(S.start + S.ferryTotal); el.arrD.textContent = 'Arrives ' + clock(S.start + S.around);
       el.pickF.hidden = S.pick !== 'ferry'; el.pickD.hidden = S.pick !== 'drive';
+      el.pickF.closest('.lane').classList.toggle('won', S.pick === 'ferry');
+      el.pickD.closest('.lane').classList.toggle('won', S.pick === 'drive');
       ['made', 'missed'].forEach(function (k) { document.getElementById('sc-' + k).setAttribute('aria-pressed', String(k === key)); });
     }
 
