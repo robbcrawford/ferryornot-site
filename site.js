@@ -434,7 +434,7 @@
       line: 'Leaving now at 11:29 PM, <em>stay on land</em> — the ferry would have you waiting 79 min at the dock.',
       ferry: { legs: [5, 79, 33, 5], sub: '2 HR 2 M · 79 MIN WAITING AT THE DOCK', flag: '' },
       drive: { min: 94, sub: '1 HR 34 M · BY THE NARROWS', legs: '94m driving · no stops', flag: 'SOONER BY 29 MIN' },
-      shot: '/assets/decide-drive-v2.webp', cap: 'Monday 11:29 PM · Bainbridge → Seattle',
+      shot: '/assets/decide-drive-v3.webp', cap: 'Monday 11:29 PM · Bainbridge → Seattle',
       alt: 'The Decision screen: Stay on land, driving gets you there 29 min sooner, the ferry would have you waiting 79 min at the dock' }
   ];
   var chips = document.getElementById('chips');
