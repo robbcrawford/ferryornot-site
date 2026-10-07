@@ -2,6 +2,7 @@
    Launch state lives on <html data-launch="pre|live">. Flip it on launch day (#37). */
 (function () {
   'use strict';
+  document.documentElement.classList.add('js');   // reveal states only apply once script runs
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- launch state: one place for every CTA ---------- */
@@ -12,8 +13,8 @@
   var PROVIDER_TOKEN = '';
 
   var STATES = {
-    pre:  { eyebrow: 'Now in App Review',    label: 'Join the TestFlight beta',   href: TESTFLIGHT_URL, sticky: 'Join the beta · free', qr: '/assets/qr-testflight.svg' },
-    live: { eyebrow: 'Now on the App Store', label: 'Download on the App Store', href: APP_STORE_URL,  sticky: 'Download · 7 days free',            qr: '/assets/qr-appstore.svg' }
+    pre:  { eyebrow: 'Now in App Review',    label: 'Join the TestFlight beta',   href: TESTFLIGHT_URL, sticky: 'Join the beta · free', qr: 'assets/qr-testflight.svg' },
+    live: { eyebrow: 'Now on the App Store', label: 'Download on the App Store', href: APP_STORE_URL,  sticky: 'Download · 7 days free',            qr: 'assets/qr-appstore.svg' }
   };
   var mode = document.documentElement.getAttribute('data-launch') === 'live' ? 'live' : 'pre';
   var S = STATES[mode];
@@ -47,40 +48,12 @@
   window.addEventListener('resize', onScroll);
   onScroll();
 
-  /* ---------- hero: the verdict resolves once ---------- */
-  var card = document.getElementById('vcard');
-  if (card && !reduce) {
-    card.classList.add('arm');
-    var steps = card.querySelectorAll('[data-step]');
-    var bar = card.querySelector('[data-bar]');
-    var cmp = document.getElementById('cmp-text');
-    var cmpHTML = cmp ? cmp.innerHTML : '';
-    var cmpText = cmp ? cmp.textContent : '';
-    var t = 350;
-    steps.forEach(function (el, i) {
-      var delay = t + i * 520;
-      if (i === 1 && cmp) {
-        // the comparison line types out, then the real markup is restored
-        setTimeout(function () {
-          el.classList.add('in');
-          var n = 0;
-          cmp.textContent = '';
-          var iv = setInterval(function () {
-            n += 2;
-            cmp.textContent = cmpText.slice(0, n);
-            if (n >= cmpText.length) { clearInterval(iv); cmp.innerHTML = cmpHTML; }
-          }, 14);
-        }, delay);
-        t += 700;
-      } else {
-        setTimeout(function () { el.classList.add('in'); }, delay);
-      }
-      if (i === 3 && bar) setTimeout(function () { bar.classList.add('in'); }, delay + 250);
-    });
-  }
+  /* ---------- Night Crossing motion: reveals, split headings, count-up ---------- */
+  var nav = document.getElementById('nav');
+  function onNav() { if (nav) nav.classList.toggle('scrolled', window.scrollY > 24); }
+  window.addEventListener('scroll', onNav, { passive: true });
+  onNav();
 
-  /* ---------- the bet: two real maps, self-hosted, on one clock (#252) ---------- */
-  var chart = document.getElementById('chart');
   function observe(el, cb, threshold, margin) {
     if (!el) return;
     if (!('IntersectionObserver' in window)) { cb(); return; }
@@ -89,6 +62,86 @@
     }, { threshold: threshold || 0, rootMargin: margin || '0px' });
     io.observe(el);
   }
+
+  // Headings marked data-split rise in word by word. <em> words keep their styling.
+  document.querySelectorAll('[data-split]').forEach(function (h) {
+    var i = 0;
+    function wrapText(node) {
+      var frag = document.createDocumentFragment();
+      node.textContent.split(/(\s+)/).forEach(function (part) {
+        if (!part) return;
+        if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(' ')); return; }
+        var w = document.createElement('span'); w.className = 'w';
+        var s = document.createElement('span'); s.style.setProperty('--i', i++); s.textContent = part;
+        w.appendChild(s); frag.appendChild(w);
+      });
+      return frag;
+    }
+    [].slice.call(h.childNodes).forEach(function (n) {
+      if (n.nodeType === 3) h.replaceChild(wrapText(n), n);
+      else if (n.nodeType === 1 && n.tagName !== 'BR') { var inner = wrapText(n); n.textContent = ''; n.appendChild(inner); }
+    });
+    h.classList.add('split');
+  });
+
+  function countUp(el) {
+    var to = +el.getAttribute('data-count'), t0 = null, dur = 1600;
+    if (reduce) { el.textContent = to; return; }
+    el.textContent = '0';
+    (function tick(now) {
+      if (t0 === null) t0 = now;
+      var p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 4);
+      el.textContent = Math.round(to * e);
+      if (p < 1) requestAnimationFrame(tick);
+    })(performance.now());
+  }
+
+  var revealEls = document.querySelectorAll('[data-reveal], .split, [data-count], #legbar');
+  if (reduce || !('IntersectionObserver' in window)) {
+    revealEls.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var rio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var el = e.target; el.classList.add('in'); rio.unobserve(el);
+        if (el.hasAttribute('data-count')) countUp(el);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    revealEls.forEach(function (el) { rio.observe(el); });
+  }
+
+  // The night sky: a fixed scatter (seeded, so it is the same on every visit), some twinkling.
+  var stars = document.getElementById('stars');
+  if (stars) {
+    stars.setAttribute('viewBox', '0 0 1440 600');
+    var seed = 7, rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    var out = '';
+    for (var n = 0; n < 150; n++) {
+      var x = rnd() * 1440, y = Math.pow(rnd(), 1.4) * 600, r = rnd() < 0.08 ? 1.5 : 0.4 + rnd() * 0.8;
+      var tw = rnd() < 0.3, op = (0.25 + rnd() * 0.6).toFixed(2);
+      out += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r.toFixed(2) + '"' +
+        (tw ? ' class="tw" style="animation-delay:' + (rnd() * 4).toFixed(2) + 's"' : ' opacity="' + op + '"') + '/>';
+    }
+    stars.innerHTML = out;
+  }
+
+  // The hero phone leans toward the pointer (desktop only).
+  var tilt = document.getElementById('tilt');
+  if (tilt && !reduce && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    var dev = tilt.querySelector('.device'), raf = 0, px = 0, py = 0;
+    window.addEventListener('pointermove', function (e) {
+      px = e.clientX / window.innerWidth - 0.5; py = e.clientY / window.innerHeight - 0.5;
+      if (raf) return;
+      raf = requestAnimationFrame(function () {
+        raf = 0;
+        dev.style.setProperty('--ry', (-8 + px * 14).toFixed(2) + 'deg');
+        dev.style.setProperty('--rx', (2 - py * 10).toFixed(2) + 'deg');
+      });
+    }, { passive: true });
+  }
+
+  /* ---------- the bet: two real maps, self-hosted, on one clock (#252) ---------- */
+  var chart = document.getElementById('chart');
   function loadScript(src) {
     return new Promise(function (res, rej) {
       var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
@@ -197,7 +250,7 @@
     var protocol = new pmtiles.Protocol();
     maplibregl.addProtocol('pmtiles', protocol.tile);
     function baseStyle() {
-      return { version: 8, sources: { base: { type: 'vector', url: 'pmtiles:///assets/map/puget.pmtiles?v=20260921' } }, layers: [
+      return { version: 8, sources: { base: { type: 'vector', url: 'pmtiles://' + new URL('assets/map/puget.pmtiles?v=20260921', document.baseURI).href } }, layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': C['map-water'] } },
         { id: 'earth', type: 'fill', source: 'base', 'source-layer': 'earth', paint: { 'fill-color': C['map-land'] } },
         { id: 'park', type: 'fill', source: 'base', 'source-layer': 'landuse', filter: ['in', 'kind', 'park', 'forest', 'wood', 'nature_reserve', 'protected_area', 'national_park', 'golf_course', 'cemetery'], paint: { 'fill-color': C['map-park'], 'fill-opacity': 0.8 } },
@@ -406,36 +459,30 @@
     if (!webgl()) { observe(chart, drawFallback, 0.35); }
     else observe(chart, function () {
       Promise.all([
-        fetch('/assets/map/journeys.json').then(function (r) { return r.json(); }),
-        loadScript('/assets/vendor/pmtiles.js').then(function () { return loadScript('/assets/vendor/maplibre-gl.js'); })
+        fetch('assets/map/journeys.json').then(function (r) { return r.json(); }),
+        loadScript('assets/vendor/pmtiles.js').then(function () { return loadScript('assets/vendor/maplibre-gl.js'); })
       ]).then(function (res) { initRace(res[0]); }).catch(function (e) { console.warn('maps unavailable, using the schematic', e); drawFallback(); });
     }, 0, '600px 0px');
   }
 
   /* ---------- how it decides: three states, only real ones render ---------- */
   // Each state is a real capture (the 2026-09-17 afternoon set, a 2026-09-23 arrive-by
-  // reading for the next midday, and the 2026-09-21 night set). Minutes drive the bar widths; the phone beside the bars shows the frame itself.
+  // reading for the next midday, and the 2026-09-21 night set). Minutes drive the bar widths.
   var DECISIONS = [
     { key: 'now', chip: 'Leave now · afternoon',
       line: 'Leaving now, <em>take the 1:15 PM ferry</em> — 43 min sooner.',
       ferry: { legs: [17, 7, 33, 8], sub: '1 HR 6 M · DOOR TO DOOR', flag: 'SOONER BY 43 MIN' },
-      drive: { min: 109, sub: '1 HR 49 M · BY THE NARROWS', legs: '109m driving · live traffic', flag: '' },
-      shot: '/assets/decide-now-v2.webp', cap: 'Thursday 12:50 PM · Bainbridge → Seattle',
-      alt: 'The Decision screen: Take the 1:15 PM ferry, 43 min sooner than driving around' },
+      drive: { min: 109, sub: '1 HR 49 M · BY THE NARROWS', legs: '109m driving · live traffic', flag: '' }, },
     { key: 'arrive', chip: 'Arrive by 2:00 PM',
       // The app's reading taken Wednesday 2026-09-23 for Thursday: arrive by 2:00 PM, Fay
       // Bainbridge Park → Seattle Center (DEBUG decision dump + the capture beside it).
       line: 'To arrive by 2:00 PM, <em>the 1:15 PM ferry</em> lets you leave 58 min later than the road.',
       ferry: { legs: [17, 4, 33, 11], sub: 'LEAVE BY 12:54 PM · 1 HR 5 M DOOR TO DOOR', flag: 'LEAVE 58 MIN LATER' },
-      drive: { min: 124, sub: 'LEAVE BY 11:56 AM · 2 HR 4 M', legs: '124m driving · predicted traffic', flag: '' },
-      shot: '/assets/decide-arrive-v2.webp', cap: 'Thursday · arrive by 2:00 PM, planned the day before',
-      alt: 'The Decision screen in Arrive-by mode: to arrive by 1:59 PM the ferry lets you leave 58 min later than driving around, leave by 12:54 PM for the 1:15 PM' },
+      drive: { min: 124, sub: 'LEAVE BY 11:56 AM · 2 HR 4 M', legs: '124m driving · predicted traffic', flag: '' }, },
     { key: 'drive', chip: 'Leave now · late night',
       line: 'Leaving now at 11:29 PM, <em>stay on land</em> — the ferry would have you waiting 79 min at the dock.',
       ferry: { legs: [5, 79, 33, 5], sub: '2 HR 2 M · 79 MIN WAITING AT THE DOCK', flag: '' },
-      drive: { min: 94, sub: '1 HR 34 M · BY THE NARROWS', legs: '94m driving · no stops', flag: 'SOONER BY 29 MIN' },
-      shot: '/assets/decide-drive-v3.webp', cap: 'Monday 11:29 PM · Bainbridge → Seattle',
-      alt: 'The Decision screen: Stay on land, driving gets you there 29 min sooner, the ferry would have you waiting 79 min at the dock' }
+      drive: { min: 94, sub: '1 HR 34 M · BY THE NARROWS', legs: '94m driving · no stops', flag: 'SOONER BY 29 MIN' }, }
   ];
   var chips = document.getElementById('chips');
   var real = DECISIONS;
@@ -453,10 +500,6 @@
     if (flag) { flag.textContent = d.ferry.flag || '\u00a0'; flag.hidden = !d.ferry.flag; }
     var dflag = document.getElementById('dflag');
     if (dflag) { dflag.textContent = d.drive.flag || '\u00a0'; dflag.hidden = !d.drive.flag; }
-    var shot = document.getElementById('decide-shot');
-    if (shot && d.shot) { shot.src = d.shot; shot.alt = d.alt || ''; }
-    var cap = document.getElementById('decide-cap');
-    if (cap) cap.textContent = d.cap || '';
     var legs = document.getElementById('legs-ferry');
     if (legs) legs.innerHTML = ['drive', 'wait', 'sailing', 'drive'].map(function (n, k) {
       return '<span class="k-' + ['drive', 'wait', 'sail', 'drive'][k] + '"><b>' + d.ferry.legs[k] + 'm</b> <i>' + n + '</i></span>';
@@ -570,7 +613,7 @@
     }, 0.3);
   }
 
-  /* ---------- the night crossing: the phone follows the steps ---------- */
+  /* ---------- I'm going: the phone follows the five steps ---------- */
   var phone = document.getElementById('phone');
   var stepEls = document.querySelectorAll('#steps .step');
   function setPhone(n) {
@@ -589,6 +632,32 @@
       el.addEventListener('click', function () { setPhone(+el.getAttribute('data-state')); });
     });
   }
+
+  /* ---------- new in 1.2: the pinned phone follows the story ---------- */
+  var storyPhone = document.getElementById('storyphone');
+  var storyRail = document.getElementById('storyrail');
+  var ssteps = document.querySelectorAll('#storysteps .sstep');
+  if (storyPhone && ssteps.length && 'IntersectionObserver' in window) {
+    var stIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var n = e.target.getAttribute('data-state');
+        ssteps.forEach(function (el) { el.classList.toggle('on', el === e.target); });
+        storyPhone.setAttribute('data-state', n);
+      });
+    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+    ssteps.forEach(function (el) { stIO.observe(el); });
+  }
+  var storyBox = document.getElementById('storysteps');
+  function onStory() {
+    if (!storyRail || !storyBox) return;
+    var r = storyBox.getBoundingClientRect(), mid = window.innerHeight / 2;
+    var p = Math.min(1, Math.max(0, (mid - r.top) / (r.height || 1)));
+    storyRail.style.setProperty('--p', (p * 100).toFixed(1) + '%');
+  }
+  window.addEventListener('scroll', onStory, { passive: true });
+  window.addEventListener('resize', onStory);
+  onStory();
 
   /* ---------- pricing toggle ---------- */
   var PRICES = {
@@ -610,17 +679,26 @@
   var stick = document.getElementById('stick');
   var heroCta = document.getElementById('hero-cta');
   var pricing = document.querySelector('.pcard');
+  var closer = document.getElementById('go');
   if (stick && heroCta && pricing && 'IntersectionObserver' in window) {
-    var heroSeen = true, pricingSeen = false;
-    function update() { stick.classList.toggle('show', !heroSeen && !pricingSeen); }
+    var heroSeen = true, pricingSeen = false, closeSeen = false;
+    function update() { stick.classList.toggle('show', !heroSeen && !pricingSeen && !closeSeen); }
     new IntersectionObserver(function (en) { heroSeen = en[0].isIntersecting; update(); }).observe(heroCta);
     new IntersectionObserver(function (en) { pricingSeen = en[0].isIntersecting; update(); }, { threshold: 0.05 }).observe(pricing);
+    if (closer) new IntersectionObserver(function (en) { closeSeen = en[0].isIntersecting; update(); }, { threshold: 0.05 }).observe(closer);
   }
 
-  /* ---------- gallery: arrow keys ---------- */
+  /* ---------- gallery: arrow keys and the round buttons ---------- */
   var gal = document.getElementById('gallery');
-  if (gal) gal.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight') { gal.scrollBy({ left: 272, behavior: reduce ? 'auto' : 'smooth' }); e.preventDefault(); }
-    if (e.key === 'ArrowLeft')  { gal.scrollBy({ left: -272, behavior: reduce ? 'auto' : 'smooth' }); e.preventDefault(); }
-  });
+  function galStep() { var f = gal.querySelector('figure'); return f ? f.offsetWidth + 24 : 300; }
+  function galBy(dir) { gal.scrollBy({ left: dir * galStep(), behavior: reduce ? 'auto' : 'smooth' }); }
+  if (gal) {
+    gal.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { galBy(1); e.preventDefault(); }
+      if (e.key === 'ArrowLeft')  { galBy(-1); e.preventDefault(); }
+    });
+    var gp = document.getElementById('gal-prev'), gn = document.getElementById('gal-next');
+    if (gp) gp.addEventListener('click', function () { galBy(-1); });
+    if (gn) gn.addEventListener('click', function () { galBy(1); });
+  }
 })();
