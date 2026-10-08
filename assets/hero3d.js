@@ -96,6 +96,39 @@ async function start() {
   button(-sx, 47, 5); button(-sx, 31, 11); button(-sx, 16, 11);
   button(sx, 28, 17); button(sx, -22, 9);
 
+  // The back, for anyone who spins it round: frosted glass, the camera plateau, a wordmark.
+  // Seen from behind, the camera sits top left, which is +x in the phone's own space.
+  const backGlass = new THREE.MeshPhysicalMaterial({ color: 0x2B2E35, metalness: 0.1, roughness: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.45 });
+  const lensGlass = new THREE.MeshPhysicalMaterial({ color: 0x05070A, metalness: 0, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02 });
+  const lensCore = new THREE.MeshPhysicalMaterial({ color: 0x0E2236, metalness: 0.2, roughness: 0.1, clearcoat: 1 });
+  const ring = new THREE.MeshPhysicalMaterial({ color: 0x55585F, metalness: 1, roughness: 0.25 });
+  const back = -D / 2;
+  const plate = new THREE.Mesh(new THREE.ShapeGeometry(arcRect(W - 2 * BEVEL - 1.2, H - 2 * BEVEL - 1.2, R - BEVEL - 0.6), 40), backGlass);
+  plate.rotation.y = Math.PI; plate.position.z = back - 0.03; phone.add(plate);
+
+  const cx = W / 2 - 21.5, cy = H / 2 - 22.5;
+  const bump = new THREE.Mesh(new THREE.ExtrudeGeometry(arcRect(36, 38, 9.5), {
+    depth: 0.8, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.5, bevelSegments: 4, curveSegments: 24
+  }), backGlass);
+  bump.rotation.y = Math.PI; bump.position.set(cx, cy, back); phone.add(bump);
+  const bumpTop = back - 1.3;
+  function disc(x, y, r, h, mat) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48), mat);
+    m.rotation.x = Math.PI / 2; m.position.set(x, y, bumpTop - h / 2 + 0.2); phone.add(m);
+  }
+  [[cx + 8.2, cy + 8.8], [cx + 8.2, cy - 8.8], [cx - 8.2, cy]].forEach(([x, y]) => {
+    disc(x, y, 6.4, 1.6, ring); disc(x, y, 5.0, 1.8, lensGlass); disc(x, y, 2.1, 1.9, lensCore);
+  });
+  disc(cx - 8.2, cy + 11.5, 2.0, 0.6, new THREE.MeshStandardMaterial({ color: 0xE9E2C8, roughness: 0.4 }));
+  disc(cx - 8.2, cy - 11.5, 2.2, 0.6, lensGlass);
+
+  new THREE.TextureLoader().load('wordmark-dark.png', (wm) => {
+    wm.colorSpace = THREE.SRGBColorSpace; wm.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const mark = new THREE.Mesh(new THREE.PlaneGeometry(34, 34 * 325 / 1836),
+      new THREE.MeshStandardMaterial({ map: wm, transparent: true, color: 0xE8DDC4, metalness: 0.3, roughness: 0.35 }));
+    mark.rotation.y = Math.PI; mark.position.set(0, -14, back - 0.06); phone.add(mark);
+  });
+
   scene.add(phone);
 
   function size() {
@@ -128,11 +161,46 @@ async function start() {
   function onScroll() { scrollP = hero ? Math.min(1, Math.max(0, window.scrollY / (hero.offsetHeight || 1))) : 0; }
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
+  // Easter egg: grab the phone and fling it. It spins on its own vertical axis, slows
+  // down, then always comes back round to face you.
+  let spin = 0, spinVel = 0, dragging = false, lastX = 0, lastT = 0;
+  tilt.addEventListener('pointerdown', (e) => {
+    if (!tilt.classList.contains('has3d') || reduce) return;
+    dragging = true; lastX = e.clientX; lastT = performance.now(); spinVel = 0;
+    tilt.setPointerCapture(e.pointerId); tilt.classList.add('spinning');
+  });
+  tilt.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const now = performance.now(), dx = e.clientX - lastX, d = dx * 0.011;
+    spin += d;
+    spinVel = 0.5 * spinVel + 0.5 * (d / Math.max(0.008, (now - lastT) / 1000));
+    lastX = e.clientX; lastT = now;
+  });
+  function release() {
+    if (!dragging) return;
+    dragging = false; tilt.classList.remove('spinning');
+    if (performance.now() - lastT > 80) spinVel = 0;   // held still before letting go
+    spinVel = Math.max(-28, Math.min(28, spinVel));
+  }
+  tilt.addEventListener('pointerup', release);
+  tilt.addEventListener('pointercancel', release);
+  tilt.addEventListener('dragstart', (e) => e.preventDefault());
+
+  function spinStep(dt) {
+    if (dragging) return;
+    spin += spinVel * dt;
+    if (Math.abs(spinVel) > 1.2) { spinVel *= Math.exp(-dt * 0.9); return; }
+    // Slow enough: ease round to the nearest whole turn, screen to the front.
+    spinVel *= Math.exp(-dt * 4);
+    const home = Math.round(spin / (Math.PI * 2)) * Math.PI * 2;
+    spin += (home - spin) * (1 - Math.exp(-dt * 2.6));
+  }
+
   function pose(t, k) {
     const ty = BASE.y + px * deg(28) + Math.sin(t * 0.42) * deg(4) + scrollP * deg(30);
     const tx = BASE.x + py * deg(16) + Math.sin(t * 0.31 + 1) * deg(2) + scrollP * deg(18);
     cur.y += (ty - cur.y) * k; cur.x += (tx - cur.x) * k;
-    phone.rotation.set(cur.x, cur.y, 0);
+    phone.rotation.set(cur.x, cur.y + spin, 0);
     phone.position.y = Math.sin(t * 0.8) * 2.2 + scrollP * 14;
   }
 
@@ -157,6 +225,7 @@ async function start() {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     // Slow at first so the turn from flat to three-quarter reads as one deliberate move.
     const settle = Math.min(1, (now - t0) / 2200);
+    spinStep(dt);
     pose((now - t0) / 1000, 1 - Math.exp(-dt * (1.2 + 3 * settle)));
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
