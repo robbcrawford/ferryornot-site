@@ -128,10 +128,16 @@ p{margin:0}
 .herocopy .small{margin-top:22px;max-width:48ch}
 .herophone{display:flex;flex-direction:column;align-items:center}
 .herophone .cap{margin-top:22px;text-align:center}
-.tilt{perspective:1400px}
+.tilt{perspective:1400px;position:relative}
+.phone-gl{position:absolute;pointer-events:none;opacity:0;transition:opacity .45s ease-out;z-index:1}
+.tilt.has3d .phone-gl{opacity:1}
+.tilt.has3d .device{opacity:0}
+.tilt::after{content:"";position:absolute;left:8%;right:8%;bottom:-7%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.65),transparent);filter:blur(6px);opacity:0;transition:opacity 1.2s var(--ease)}
+.tilt::before{content:"";position:absolute;inset:10% -20%;background:radial-gradient(closest-side,rgba(217,178,94,.16),transparent 70%);opacity:0;transition:opacity 1.2s var(--ease);pointer-events:none}
+.tilt.has3d::after,.tilt.has3d::before{opacity:1}
 .phone-3d{animation:phoneIn 1.9s var(--ease) .45s both}
 @keyframes phoneIn{from{opacity:0;transform:rotateX(26deg) rotateY(-16deg) translateY(90px) scale(.9)}to{opacity:1;transform:none}}
-.tilt .device{transform:rotateY(var(--ry,-8deg)) rotateX(var(--rx,2deg));transition:transform .9s var(--ease);animation:float 8s ease-in-out 2.4s infinite}
+.tilt .device{transform:rotateY(var(--ry,-8deg)) rotateX(var(--rx,2deg));transition:transform .9s var(--ease),opacity .45s ease-in;animation:float 8s ease-in-out 2.4s infinite}
 @keyframes float{0%,100%{translate:0 0}50%{translate:0 -12px}}
 @media (max-width:900px){.herogrid{grid-template-columns:1fr;gap:56px;padding-top:16px}.hero{padding-bottom:180px}.moon{right:8%;top:6%}.sea{height:220px}.boatlight{bottom:152px}}
 

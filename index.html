@@ -90,7 +90,7 @@
       <p class="small" data-reveal style="--d:1.05s">Ten Washington State Ferries crossings across Puget Sound. Independent, not affiliated with WSF or WSDOT.</p>
     </div>
     <div class="herophone">
-      <div class="tilt" id="tilt">
+      <div class="tilt" id="tilt" data-hd="assets/v12-decide-hd.webp">
         <div class="phone-3d">
           <div class="device big">
             <img src="assets/v12-decide.webp" alt="FerryOrNot deciding a trip from Winslow on Bainbridge Island to Pike Place Market: take the 12:20 PM ferry, 73 minutes sooner than driving around, with each drive coloured by live traffic" width="640" height="1391" fetchpriority="high">
@@ -315,13 +315,13 @@
         <span class="eyebrow">B · We kept counting</span>
         <svg viewBox="0 0 220 84" aria-hidden="true">
           <line x1="10" y1="64" x2="210" y2="64" stroke="var(--hair-strong)"/>
-          <path d="M10 60 L60 46 L100 36 L210 36" fill="none" stroke="var(--muted)" stroke-width="2.5" pathLength="1" class="drawline"/>
-          <path d="M10 60 L60 46 L100 36 L140 22 L210 10" fill="none" stroke="var(--brass)" stroke-width="3" stroke-linecap="round" pathLength="1" class="drawline slow"/>
+          <path d="M10 60 L60 46 L100 36 L152 36" fill="none" stroke="var(--muted)" stroke-width="2.5" pathLength="1" class="drawline"/>
+          <path d="M10 60 L60 46 L100 36 L128 25 L152 13" fill="none" stroke="var(--brass)" stroke-width="3" stroke-linecap="round" pathLength="1" class="drawline slow"/>
           <line x1="100" y1="6" x2="100" y2="68" stroke="var(--red)" stroke-dasharray="3 3"/>
           <text x="104" y="80" fill="var(--red)">+5 MIN · APP FREEZES</text>
           <text x="12" y="80" fill="var(--muted)">SCHEDULED</text>
-          <text x="150" y="48" fill="var(--muted)">WSF APP</text>
-          <text x="150" y="20" fill="var(--brass)">FERRYORNOT</text>
+          <text x="158" y="39" fill="var(--muted)">WSF APP</text>
+          <text x="158" y="16" fill="var(--brass)">FERRYORNOT</text>
         </svg>
         <p class="fig">Their app stops at +5, <span>but the boat is still loading.</span></p>
         <p>WSF stops updating a sailing's count five minutes after its scheduled time, even when the boat is late and still taking cars. FerryOrNot's backend keeps counting and serves its own figure for exactly the time when WSF's app goes dark.</p>
@@ -575,5 +575,6 @@
 <div class="stick" id="stick"><a class="btn cta" data-cta="sticky" href="https://apps.apple.com/app/id6782129413">Download · 7 days free</a></div>
 
 <script src="site.js" defer></script>
+<script type="module" src="assets/hero3d.js"></script>
 </body>
 </html>
