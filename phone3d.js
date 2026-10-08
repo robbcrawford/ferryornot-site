@@ -129,7 +129,13 @@ async function mountPhone(tilt, opts) {
     wm.colorSpace = THREE.SRGBColorSpace; wm.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const mark = new THREE.Mesh(new THREE.PlaneGeometry(34, 34 * 325 / 1836),
       new THREE.MeshStandardMaterial({ map: wm, transparent: true, color: 0xE8DDC4, metalness: 0.3, roughness: 0.35 }));
-    mark.rotation.y = Math.PI; mark.position.set(0, -14, back - 0.06); phone.add(mark);
+    mark.rotation.y = Math.PI; mark.position.set(0, -17, back - 0.06); phone.add(mark);
+  });
+  new THREE.TextureLoader().load('assets/app-icon-512.webp', (ic) => {
+    ic.colorSpace = THREE.SRGBColorSpace; ic.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const g = new THREE.ShapeGeometry(arcRect(19, 19, 4.3), 16); planarUV(g);   // the icon's rounded square
+    const icon = new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({ map: ic, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.1 }));
+    icon.rotation.y = Math.PI; icon.position.set(0, -2, back - 0.06); phone.add(icon);
   });
 
   scene.add(phone);
@@ -246,11 +252,12 @@ const warn = (e) => console.warn('3D phone unavailable, keeping the flat one', e
 if (webgl()) {
   const hero = document.getElementById('tilt');
   if (hero) mountPhone(hero, { base: [-24, 6], scroll: 1, after: 2400 }).catch(warn);
-  // Other phones wake up only as they come near the screen.
+  // Other phones wake up only as they come near the screen. The pricing phone sits on the
+  // left, so it turns to face right, into the page.
   document.querySelectorAll('.tilt[data-hd]:not(#tilt)').forEach((el) => {
     const io = new IntersectionObserver((en) => {
       if (!en[0].isIntersecting) return;
-      io.disconnect(); mountPhone(el, { base: [-22, 4], scroll: 0, after: 0 }).catch(warn);
+      io.disconnect(); mountPhone(el, { base: [22, 4], scroll: 0, after: 0 }).catch(warn);
     }, { rootMargin: '300px 0px' });
     io.observe(el);
   });
