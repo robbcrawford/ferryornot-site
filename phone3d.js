@@ -1,12 +1,12 @@
-/* The hero phone as a real, lit 3D object (three.js, self-hosted, no requests elsewhere).
-   The flat CSS phone in the page stays as the fallback: no WebGL, a slow load, or an
-   error simply leaves it in place. When the 3D one is ready it takes the flat one's
-   exact pose, cross-fades in, then turns to show its titanium edge. */
-import * as THREE from './vendor/three/three.module.min.js';
-import { RoomEnvironment } from './vendor/three/RoomEnvironment.js';
+/* Real, lit 3D phones (three.js, self-hosted, no requests elsewhere): the hero phone and
+   the small one by the pricing. The flat CSS phone in the page stays as the fallback: no
+   WebGL, a slow load, or an error simply leaves it in place. When a 3D one is ready it
+   takes the flat one's exact pose, cross-fades in, then turns to show its titanium edge.
+   Lives at the site root, not in /assets/, because /assets/* is cached for a year and this
+   file changes; the three.js files it imports never do. */
+import * as THREE from './assets/vendor/three/three.module.min.js';
+import { RoomEnvironment } from './assets/vendor/three/RoomEnvironment.js';
 
-const tilt = document.getElementById('tilt');
-const flat = tilt && tilt.querySelector('.device');
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function webgl() {
@@ -35,8 +35,11 @@ function planarUV(geo) {   // map a flat shape's x/y straight onto 0..1 texture 
   uv.needsUpdate = true;
 }
 
-async function start() {
-  if (!tilt || !flat || !webgl()) return;
+// opts.base: resting [turn, tilt] in degrees; opts.scroll: how far scrolling turns it away;
+// opts.after: earliest swap time (ms since the page started), so a CSS entrance can finish.
+async function mountPhone(tilt, opts) {
+  const flat = tilt.querySelector('.device');
+  if (!flat) return;
   const src = tilt.getAttribute('data-hd');
   if (!src) return;
 
@@ -150,7 +153,7 @@ async function start() {
   // three-quarter turn that shows the edge. The pointer leans it; scrolling turns it away.
   const deg = THREE.MathUtils.degToRad;
   const cur = { y: deg(-8), x: deg(2) };
-  const BASE = { y: deg(-24), x: deg(6) };
+  const BASE = { y: deg(opts.base[0]), x: deg(opts.base[1]) };
   let px = 0, py = 0, scrollP = 0;
   if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
     window.addEventListener('pointermove', (e) => {
@@ -158,8 +161,8 @@ async function start() {
     }, { passive: true });
   }
   const hero = tilt.closest('section');
-  function onScroll() { scrollP = hero ? Math.min(1, Math.max(0, window.scrollY / (hero.offsetHeight || 1))) : 0; }
-  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  function onScroll() { scrollP = opts.scroll * Math.min(1, Math.max(0, window.scrollY / (hero.offsetHeight || 1))); }
+  if (opts.scroll) { window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
 
   // Easter egg: grab the phone and fling it. It spins on its own vertical axis, slows
   // down, then always comes back round to face you.
@@ -213,7 +216,7 @@ async function start() {
   }
 
   // Swap only after the flat phone's own entrance has finished, so the hand-off is invisible.
-  const entranceDone = 2400 - performance.now();
+  const entranceDone = opts.after - performance.now();
   await new Promise((res) => setTimeout(res, Math.max(0, entranceDone)));
   phone.rotation.set(cur.x, cur.y, 0);
   renderer.render(scene, camera);
@@ -239,4 +242,16 @@ async function start() {
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(size, 100); });
 }
 
-start().catch((e) => { console.warn('3D phone unavailable, keeping the flat one', e); });
+const warn = (e) => console.warn('3D phone unavailable, keeping the flat one', e);
+if (webgl()) {
+  const hero = document.getElementById('tilt');
+  if (hero) mountPhone(hero, { base: [-24, 6], scroll: 1, after: 2400 }).catch(warn);
+  // Other phones wake up only as they come near the screen.
+  document.querySelectorAll('.tilt[data-hd]:not(#tilt)').forEach((el) => {
+    const io = new IntersectionObserver((en) => {
+      if (!en[0].isIntersecting) return;
+      io.disconnect(); mountPhone(el, { base: [-22, 4], scroll: 0, after: 0 }).catch(warn);
+    }, { rootMargin: '300px 0px' });
+    io.observe(el);
+  });
+}

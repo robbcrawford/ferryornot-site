@@ -8,4 +8,4 @@ derived from OpenStreetMap (© OpenStreetMap contributors, ODbL) and Natural Ear
 is printed under the map.
 
 ## three.js 0.180.0 (three/)
-`three.module.min.js`, `three.core.min.js` and `RoomEnvironment.js` (its import path changed to the local file), from the `three` npm package. MIT licence, copyright 2010-2025 three.js authors: see `three/LICENSE.txt`. Used only for the hero phone (`assets/hero3d.js`).
+`three.module.min.js`, `three.core.min.js` and `RoomEnvironment.js` (its import path changed to the local file), from the `three` npm package. MIT licence, copyright 2010-2025 three.js authors: see `three/LICENSE.txt`. Used only for the 3D phones (`/phone3d.js`).
